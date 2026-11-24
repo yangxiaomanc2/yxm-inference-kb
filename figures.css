@@ -1,0 +1,35 @@
+.kb-figure{margin:18px 0 24px;min-width:0}
+.kb-figure .fig-title{font:500 19px/1.4 var(--serif);margin:0 0 10px}
+.kb-figure figcaption,.fig-control,.fig-description{font-size:13px;color:var(--muted)}
+.kb-figure figcaption{margin-top:8px;overflow-wrap:anywhere}
+.fig-scroll,.fig-codebody{overflow-x:auto}
+.fig-scroll,.fig-flow{border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.fig-scroll svg{display:block;max-width:none;font:14px var(--sans);fill:var(--ink)}
+.fig-scroll g{cursor:pointer}
+.fig-scroll g.dim{opacity:.4}
+.fig-scroll g:focus-visible rect{stroke-width:3}
+.fig-stage-title{font-weight:600}
+.fig-scroll .fig-dim{font-size:12px;fill:var(--muted)}
+.kb-figure .fig-description{margin:8px 0 0}
+.fig-description:empty{display:none}
+.fig-control{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.fig-control button,.fig-steps button{font:inherit;cursor:pointer;color:inherit}
+.fig-control button{padding:2px 10px;border-radius:7px;border:1px solid var(--line);background:var(--surface)}
+.fig-panes{display:grid;grid-template-columns:minmax(205px,1fr) minmax(0,2fr);gap:12px;align-items:start}
+.fig-flow{padding:12px}
+.kb-figure .fig-steps{margin:0;list-style:none}
+.kb-figure .fig-steps li{margin:0}
+.fig-steps button{display:flex;flex-wrap:wrap;gap:4px 9px;align-items:center;justify-content:space-between;width:100%;
+padding:7px;text-align:left;border:0;border-radius:6px;background:transparent}
+.fig-steps button[aria-pressed=true]{background:var(--soft);box-shadow:inset 2px 0 var(--accent)}
+.fig-step-line{font:11px var(--mono);color:var(--muted)}
+.fig-code{min-width:0;border-radius:12px;background:#1f1e1d;color:#c2bfb8;overflow:hidden}
+.fig-codehead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding:10px 12px;
+border-bottom:1px solid #34322f;font:11px/1.4 var(--mono);overflow-wrap:anywhere}
+.fig-codehead a{color:#f0eee6}
+.fig-codebody{display:grid;padding:6px 0;font:12px/1.65 var(--mono)}
+.fig-line{display:flex;width:max-content;min-width:100%;white-space:pre;padding-right:14px;
+border-left:2px solid transparent}
+.fig-line.active{border-color:var(--accent);background:#45332b;color:#faf9f5}
+.fig-lineno{display:inline-block;min-width:45px;text-align:right;margin-right:12px;color:#c2bfb8;user-select:none}
+@media(max-width:600px){.fig-panes{grid-template-columns:minmax(0,1fr)}}

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>知识页 · YXM 知识库</title>
+<link rel="stylesheet" href="./figures.css">
 <style>
 :root{--bg:#faf9f5;--surface:#ffffff;--ink:#141413;--muted:#6b6a65;--line:#e8e6dc;
 --accent:#d97757;--accent-2:#f38020;--soft:#f0eee6;
@@ -25,28 +26,27 @@ border:1px solid var(--ink);background:transparent;color:var(--ink)}
 .btn:hover{background:var(--soft)}
 .btn.on{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
 .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-.hero{padding:88px 0 0}
-.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.hero{padding:44px 0 0}
 h1.t{font-family:var(--serif);font-weight:500;letter-spacing:-.02em;
 font-size:clamp(32px,5vw,60px);line-height:1.12;margin:18px 0 0}
-.lead{color:var(--muted);max-width:46ch;margin-top:18px;font-size:16px}
-.facts{display:flex;flex-wrap:wrap;gap:40px;margin-top:40px;padding-top:28px;
-border-top:1px solid var(--line)}
-.facts .v{font-family:var(--serif);font-size:clamp(24px,3.4vw,38px);color:var(--accent);line-height:1.1}
-.facts .l{font-size:12px;color:var(--muted);margin-top:6px}
+.lead{color:var(--muted);max-width:68ch;margin-top:14px;font-size:16px}
+.lead:empty{display:none}
 .banner{background:var(--soft);border-left:3px solid var(--accent-2);padding:12px 16px;
 font-size:13px;color:var(--muted);margin-top:24px;border-radius:0 8px 8px 0}
-.layout{display:grid;grid-template-columns:232px minmax(0,1fr);gap:56px;
-align-items:start;margin-top:64px}
+.layout{display:grid;grid-template-columns:168px minmax(0,1fr);gap:32px;
+align-items:start;margin-top:36px}
+.layout>div{min-width:0}
 .toc{position:sticky;top:84px;max-height:calc(100vh - 120px);overflow:auto;
 font-size:13px;border-left:1px solid var(--line);padding-left:16px}
-.toc .cap{font-size:11px;letter-spacing:.14em;text-transform:uppercase;
-color:var(--muted);margin-bottom:12px}
+.toc summary,.article-details summary{cursor:pointer}
+.article-details{margin-top:32px;border-top:1px solid var(--line);padding-top:16px;scroll-margin-top:76px}
+.article-details>div{margin-top:18px}
+.kb-figure{scroll-margin-top:76px}
 .toc a{display:block;color:var(--muted);padding:4px 0;line-height:1.45}
 .toc a:hover{color:var(--ink);text-decoration:none}
 .toc a.l3{padding-left:14px;font-size:12.5px}
 .toc a.on{color:var(--accent)}
-article{min-width:0;font-size:15.5px}
+article{min-width:0;font-size:15.5px;overflow-wrap:anywhere}
 article h2{font-family:var(--serif);font-weight:500;font-size:clamp(24px,3vw,32px);
 letter-spacing:-.01em;margin:64px 0 16px;padding-top:8px;scroll-margin-top:76px}
 article h2:first-child{margin-top:0}
@@ -79,14 +79,14 @@ background:var(--surface);border:1px solid var(--line);border-radius:12px;paddin
 .editor .row{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
 .editor .pri{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
 .editor .hint{margin-right:auto;font-size:12px;color:var(--muted);align-self:center}
-footer{border-top:1px solid var(--line);margin-top:72px;padding:28px 0 56px;
+footer{border-top:1px solid var(--line);margin-top:42px;padding:20px 0 40px;
 color:var(--muted);font-size:12.5px}
-footer p+p{margin-top:4px}
+footer h2{font:600 14px var(--sans);margin-bottom:6px}
+footer a{color:inherit;text-decoration:underline}
 @media(max-width:900px){.layout{grid-template-columns:1fr;gap:32px}
-.toc{position:static;max-height:none;border-left:0;border-top:1px solid var(--line);
-padding:16px 0 0;columns:2}}
-@media(max-width:600px){.hero{padding-top:56px}.facts{gap:24px}
-.wrap{padding:0 18px}article{font-size:15px}.toc{columns:1}
+.toc{position:static;max-height:none;border-left:0;padding:0}}
+@media(max-width:600px){.hero{padding-top:34px}
+.wrap{padding:0 18px}article{font-size:15px}
 .bar .wrap{padding:8px 18px}}
 </style>
 </head>
@@ -98,21 +98,19 @@ padding:16px 0 0;columns:2}}
 </div></header>
 
 <section class="hero wrap">
-  <div class="eyebrow" id="eyebrow"></div>
   <h1 class="t" id="title">正在读取…</h1>
   <p class="lead" id="lead"></p>
-  <div class="facts" id="facts"></div>
   <div class="banner" id="banner" hidden></div>
 </section>
 
 <main class="wrap layout">
-  <aside class="toc"><div class="cap">本页目录</div><div id="toc"></div></aside>
+  <details class="toc" id="toc-panel" open hidden><summary>目录</summary><nav id="toc" aria-label="本页目录"></nav></details>
   <div>
     <article id="body"></article>
     <div class="editor">
       <textarea id="md" spellcheck="false"></textarea>
       <div class="row">
-        <span class="hint">内容存在 Supabase，保存后所有打开这页的设备即时更新</span>
+        <span class="hint">编辑内容公开可见</span>
         <button class="btn" id="cancel">放弃修改</button>
         <button class="btn pri" id="save">保存</button>
       </div>
@@ -120,11 +118,12 @@ padding:16px 0 0;columns:2}}
   </div>
 </main>
 
-<footer class="wrap">
-  <p id="foot"></p>
-  <p>正文以 markdown 存在 Supabase，任何人可在线编辑；请只放公开信息。</p>
+<footer class="wrap" id="foot" hidden>
+  <h2>备注</h2>
+  <div id="notes"></div>
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./figures.js"></script>
 <script>
 const SB_URL='https://jfvktpiumonhsgsgwbcc.supabase.co';
 const SB_KEY='sb_publishable_iwjdJ0BVThvZVEpq2t2tgw_OskNS6U1';
@@ -139,10 +138,10 @@ const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','
 function inline(text){
   const holes=[];
   const stash=m=>{holes.push(m);return '\u0000'+(holes.length-1)+'\u0000';};
-  let t=esc(text);
+  let t=esc(text).replace(/\u0000/g,'\ufffd');
   t=t.replace(/`([^`]+)`/g,(m,a)=>stash('<code>'+a+'</code>'));
-  t=t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-    (m,a,b)=>stash('<a href="'+b.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener">'+a+'</a>'));
+  t=t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)\u0000]+)\)/g,
+    (m,a,b)=>stash('<a href="'+b.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener">'+a.replace(/\u0000(\d+)\u0000/g,(_,i)=>holes[+i])+'</a>'));
   t=t.replace(/\*\*([^*]+)\*\*/g,(m,a)=>stash('<strong>'+a+'</strong>'));
   return t.replace(/\u0000(\d+)\u0000/g,(m,i)=>holes[+i]);
 }
@@ -207,7 +206,7 @@ function renderMd(md){
       const buf=[];i++;
       while(i<n&&!lines[i].startsWith('```')){buf.push(lines[i]);i++;}
       i++;
-      out.push('<pre'+(lang?' class="lang-'+esc(lang)+'"':'')+'><code>'+esc(buf.join('\n'))+'</code></pre>');
+      out.push('<pre'+(/^[\w+-]+$/.test(lang)?' class="lang-'+lang+'"':'')+'><code>'+esc(buf.join('\n'))+'</code></pre>');
       continue;
     }
     const h=line.match(/^(#{1,4})\s+(.*)$/);
@@ -249,58 +248,80 @@ function renderMd(md){
     if(!line.trim()){i++;continue;}
     const buf=[];
     while(i<n&&lines[i].trim()&&!BLOCK.test(lines[i])){buf.push(lines[i].trim());i++;}
+    if(!buf.length){buf.push(line.trim());i++;}
     out.push('<p>'+inline(buf.join(' '))+'</p>');
   }
   return {title:title,html:out.join('\n'),toc:toc};
 }
 
-/* ---------- 正文统计：只数正文，不数代码块内部 ---------- */
-function stats(md){
-  const lines=String(md||'').split('\n');
-  let inside=false,fences=0,tables=0;
-  const body=[];
-  lines.forEach(ln=>{
-    if(ln.startsWith('```')){fences++;inside=!inside;return;}
-    if(inside)return;
-    body.push(ln);
-    if(/^\s*\|[\s:|-]+\|?\s*$/.test(ln))tables++;
-  });
-  const text=body.join('\n');
-  const chars=text.replace(/\s+/g,'').length;
-  return [
-    ['字数',chars>=1000?Math.floor(chars/1000)+'k':String(chars)],
-    ['章节',String((text.match(/^## /gm)||[]).length)],
-    ['表格',String(tables)],
-    ['代码块',String(Math.floor(fences/2))]
-  ];
+function readingCopy(md){
+  const text=String(md||'').replace(/\r\n/g,'\n');
+  const firstSection=text.search(/^## /m);
+  if(firstSection<0 || !['deepinfer','flash','harness','openrsi'].includes(SLUG))return text;
+  let intro=text.slice(0,firstSection);
+  if(SLUG==='deepinfer')intro=intro
+    .replace(/^> (?:读者|源码版本|模型配置|文中路径).*$/gm,'')
+    .replace(/^\*\*标注约定\*\*\n\n(?:- [^\n]*\n){3}/m,'')
+    .replace(/^---\s*$/m,'\n');
+  if(SLUG==='flash')intro=intro.replace(/^> (?:更新时间|主要依据|约定).*$/gm,'');
+  return intro+text.slice(firstSection)
+    .replace(/^本文的代码片段都来自 .+路径相对各自仓库根目录。.+$/gm,'')
+    .replace(/^本文基于仓库 commit .+阅读源码。除标注 .+$/gm,'');
 }
 
 function banner(msg){const b=$('#banner');b.hidden=false;b.textContent=msg;}
 let row=null,io=null;
 
-function paint(d){
-  const r=renderMd(d.md);
+function paint(d,figures=[],notes=''){
+  const r=renderMd(readingCopy(d.md));
   const title=d.title||r.title||'未命名知识页';
   document.title=title+' · YXM 知识库';
-  $('#eyebrow').textContent=d.eyebrow||'YXM 知识库';
   $('#title').textContent=title;
   $('#lead').textContent=d.lead||'';
-  const f=$('#facts');f.textContent='';
-  stats(d.md).forEach(([k,v])=>{
-    const w=document.createElement('div');
-    const vv=document.createElement('div');vv.className='v';vv.textContent=v;
-    const ll=document.createElement('div');ll.className='l';ll.textContent=k;
-    w.append(vv,ll);f.appendChild(w);
-  });
-  $('#body').innerHTML=r.html;
+  const body=$('#body');
+  const previousOpen=body.querySelector('.article-details')?.open;
+  body.querySelectorAll('.kb-figure').forEach(fig=>fig.disposeFigure?.());
+  body.replaceChildren();
+  const links=[];
+  if(figures.length){
+    figures.forEach((data,i)=>{
+      const fig=Fig.render(data,i+1);
+      fig.id='kb-figure-'+(i+1);
+      body.append(fig);
+      links.push([2,fig.id,data.title]);
+    });
+    const details=document.createElement('details');
+    details.className='article-details';
+    details.id='reading-details';
+    details.open=Boolean(previousOpen);
+    const summary=document.createElement('summary');
+    summary.textContent='展开完整分析与数据对照';
+    const reading=document.createElement('div');
+    reading.innerHTML=r.html;
+    details.append(summary,reading);
+    body.append(details);
+    links.push([2,details.id,'完整分析与数据对照']);
+    let hash=location.hash.slice(1);
+    try{hash=decodeURIComponent(hash);}catch{}
+    const target=document.getElementById(hash);
+    if(target && reading.contains(target)){
+      details.open=true;
+      target.scrollIntoView();
+    }
+  }else{
+    body.innerHTML=r.html;
+    links.push(...r.toc);
+  }
   const toc=$('#toc');toc.textContent='';
-  r.toc.forEach(([lv,id,text])=>{
+  $('#toc-panel').hidden=!links.length;
+  links.forEach(([lv,id,text])=>{
     const a=document.createElement('a');
     a.className='l'+lv;a.href='#'+id;a.textContent=text;
     toc.appendChild(a);
   });
   $('#md').value=d.md||'';
-  $('#foot').textContent='来源：各项目仓库源码、官方技术报告与公开资料；标注「工程推断」的段落为作者推断。';
+  $('#foot').hidden=!d.md;
+  $('#notes').innerHTML=inline(notes||'「工程推断」表示作者依据公开材料作出的判断。');
   spy();
 }
 
@@ -316,17 +337,22 @@ function spy(){
       if(a)a.classList.add('on');
     });
   },{rootMargin:'-76px 0px -70% 0px',threshold:0});
-  document.querySelectorAll('#body h2[id],#body h3[id]').forEach(h=>io.observe(h));
+  map.forEach((_,id)=>{const target=document.getElementById(id);if(target)io.observe(target);});
 }
 
 async function load(){
   if(!SLUG){$('#title').textContent='缺少参数 p';banner('网址里需要带 ?p=<知识页标识>，例如 article.html?p=deepinfer');return;}
   const {data,error}=await sb.from('pages_blocks').select('*').eq('page',PAGE).order('sort');
   if(error){$('#title').textContent='读取失败';banner('读取失败：'+error.message);return;}
-  if(!data||!data.length){$('#title').textContent='这页还没有内容';
+  row=data?.find(record=>record.section==='article')||null;
+  if(!row){$('#title').textContent='这页还没有内容';
     banner('Supabase 里没有 page='+PAGE+' 的记录。点「编辑」可以直接写入第一版。');
     row={id:null,page:PAGE,section:'article',sort:0,data:{}};paint({md:''});return;}
-  row=data[0];paint(row.data||{});
+  const figures=typeof Fig==='undefined'?[]:data
+    .filter(record=>record.section==='figure'&&Fig.isFigure(record.data)&&!Fig.validate(record.data).length)
+    .map(record=>record.data);
+  const notes=data.find(record=>record.section==='notes')?.data?.body;
+  paint(row.data||{},figures,typeof notes==='string'?notes:'');
 }
 $('#toggle').onclick=()=>{
   const on=document.body.classList.toggle('edit');
@@ -362,6 +388,7 @@ sb.channel('kb-'+PAGE)
     if(!document.body.classList.contains('edit'))load();
   })
   .subscribe();
+if(matchMedia('(max-width: 900px)').matches)$('#toc-panel').open=false;
 load();
 </script>
 </body>
