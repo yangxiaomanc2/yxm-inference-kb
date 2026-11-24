@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="大模型推理优化工程师的系统学习地图：基础、KV Cache、量化、算子、引擎、分布式与成本。">
+  <title>Inference Atlas · 大模型推理优化技术地图</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="curriculum.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#overview"><span class="brand-icon">iA</span><span>INFERENCE ATLAS<small>大模型推理优化 · 学习地图</small></span></a>
+    <div class="edition">ENGINEERING FIELD GUIDE / 2026.10</div>
+    <nav aria-label="网站导航">
+      <a href="#overview" class="nav-link active"><span>01</span>全景与方法</a>
+      <a href="#knowledge" class="nav-link"><span>02</span>技术知识地图</a>
+      <a href="#mastery" class="nav-link"><span>03</span>三条精通路径</a>
+      <a href="#lab" class="nav-link"><span>04</span>性能估算实验室</a>
+      <a href="#roadmap" class="nav-link"><span>05</span>学习计划与项目</a>
+      <a href="#frontier" class="nav-link"><span>06</span>发展与技术判断</a>
+      <a href="#resources" class="nav-link"><span>07</span>论文与官方资料</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="progress-label"><span>知识点完成度</span><strong id="progress-text">0 / 0</strong></div>
+      <progress id="learning-progress" value="0" max="100"></progress>
+      <p>进度保存在当前浏览器，可导出备份。</p>
+      <button id="export-progress" class="text-button">导出进度 ↗</button>
+      <label class="text-button import-label">导入进度<input type="file" id="import-progress" accept=".json,application/json"></label>
+      <span id="storage-status" role="status"></span>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar"><span>从计算图，到每百万 Token 成本</span><a href="#knowledge">开始探索 <span aria-hidden="true">↗</span></a></header>
+    <section id="overview" class="hero section-anchor">
+      <div class="eyebrow"><span class="live-dot"></span> A SYSTEMATIC PATH TO INFERENCE ENGINEERING</div>
+      <h1>理解每一次计算，<br>优化每一个 <em>Token.</em></h1>
+      <p class="hero-description">为大模型推理优化工程师搭建的系统知识框架。先建立性能模型，再深入 KV Cache、量化与算子，最终把单卡优化连接到集群效率和业务成本。</p>
+      <div class="hero-actions"><a class="button primary" href="#knowledge">打开技术地图 <span>↓</span></a><a class="button secondary" href="#roadmap">查看 24 周学习路线 ↗</a></div>
+      <div class="hero-stats"><div><strong>12</strong><span>知识领域</span></div><div><strong id="topic-count">—</strong><span>可展开技术单元</span></div><div><strong>3</strong><span>核心精通路径</span></div><div><strong>24 周</strong><span>建议主线节奏</span></div></div>
+      <div class="hero-visual" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="chip"><span>LLM</span><small>INFERENCE</small></div><span class="orbit-label label-a">COMPUTE</span><span class="orbit-label label-b">MEMORY</span><span class="orbit-label label-c">NETWORK</span><span class="visual-caption">FLOPs / BYTES / LATENCY</span></div>
+    </section>
+    <div class="principle-strip"><span>学习闭环</span><strong>结构拆解</strong><i>→</i><strong>定量预测</strong><i>→</i><strong>实验验证</strong><i>→</i><strong>偏差归因</strong><i>→</i><strong>SLO 下的收益</strong></div>
+    <section class="intro-grid">
+      <article class="intro-card"><span class="mini-index">A / 广度</span><h3>建立完整的技术坐标</h3><p>从数值与硬件，到模型、引擎、网络、服务和成本。知道一项优化作用在哪里，以及瓶颈转移到哪里。</p></article>
+      <article class="intro-card"><span class="mini-index">B / 深度</span><h3>用可交付成果定义精通</h3><p>不以“读过论文”为终点。能推公式、读源码、实现方案、设计对照实验，并解释质量与性能的取舍。</p></article>
+      <article class="intro-card"><span class="mini-index">C / 判断力</span><h3>把预测写成可证伪假设</h3><p>区分理论、特定版本实现和趋势判断。持续记录前提、观测指标、反例与重新评估时间。</p></article>
+    </section>
+    <section id="knowledge" class="section-anchor">
+      <div class="section-heading"><div><div class="eyebrow">01 / KNOWLEDGE MAP</div><h2>技术知识地图</h2><p>按依赖顺序学习，也可以沿着你正在解决的瓶颈进入。</p></div><span class="badge">点击技术单元查看学习内容与验收</span></div>
+      <div class="knowledge-toolbar"><label class="search"><span aria-hidden="true">⌕</span><input id="search-input" type="search" placeholder="搜索技术、算法、公式或实验，例如：GQA / AWQ / Roofline" aria-label="搜索知识点"><kbd>/</kbd></label><div class="filters" id="filters" aria-label="知识点筛选"><button class="filter active" data-filter="all" aria-pressed="true">全部</button><button class="filter" data-filter="基础" aria-pressed="false">基础</button><button class="filter" data-filter="KV Cache" aria-pressed="false">KV Cache</button><button class="filter" data-filter="量化" aria-pressed="false">量化</button><button class="filter" data-filter="算子" aria-pressed="false">算子</button><button class="filter" data-filter="系统" aria-pressed="false">系统</button><button class="filter" data-filter="前沿" aria-pressed="false">前沿</button><button class="filter" data-filter="unfinished" aria-pressed="false">未完成</button></div></div>
+      <div class="results-line"><span id="result-count" role="status"></span><span>建议：基础 → 模型与性能 → 三条专精 → 系统与成本</span></div>
+      <div id="module-grid" class="module-grid"></div><div id="empty-state" hidden>没有匹配的知识点。试试“缓存”“通信”或清空筛选条件。</div>
+    </section>
+    <section id="mastery" class="section-anchor">
+      <div class="section-heading"><div><div class="eyebrow">02 / GO DEEP</div><h2>三条精通路径</h2><p>从“知道为什么”走到“能独立实现并证明收益”。</p></div></div>
+      <div class="mastery-grid" id="mastery-grid"></div>
+      <div class="callout"><strong>统一毕业标准</strong><p>提供正确性对照、质量回归、性能剖析、端到端收益和失败案例；锁定模型 revision、引擎 commit、驱动与后端版本。只报告 kernel 加速比，不能证明服务成本下降。</p></div>
+    </section>
+    <section id="lab" class="section-anchor">
+      <div class="section-heading"><div><div class="eyebrow">03 / PENCIL BEFORE PROFILER</div><h2>性能估算实验室</h2><p>先手算数量级，再用实测带宽与吞吐校准。以下是 GQA / MHA 的简化容量模型。</p></div></div>
+      <div class="lab-layout">
+        <form id="calculator" class="calc-inputs">
+          <div class="calc-title"><h3>配置一个 Decoder</h3><select id="preset" aria-label="选择估算预设"><option value="gqa">8B 级 GQA · 示例</option><option value="mha">7B 级 MHA · 示例</option><option value="custom">自定义</option></select></div>
+          <div class="input-grid">
+            <label>模型参数量 / B<input name="params" type="number" min="0.01" step="0.1" value="8" required></label>
+            <label>层数 L<input name="layers" type="number" min="1" step="1" value="32" required></label>
+            <label>并发序列 B<input name="batch" type="number" min="1" step="1" value="16" required></label>
+            <label>已缓存长度 T<input name="tokens" type="number" min="1" step="1" value="8192" required></label>
+            <label>KV 头数 Hkv<input name="heads" type="number" min="1" step="1" value="8" required></label>
+            <label>头维度 dh<input name="dim" type="number" min="1" step="1" value="128" required></label>
+            <label>权重位宽 / bit<select name="weightBits"><option value="16">16</option><option value="8">8</option><option value="4">4</option></select></label>
+            <label>KV 位宽 / bit<select name="kvBits"><option value="16">16</option><option value="8">8</option><option value="4">4</option><option value="2">2</option></select></label>
+            <label>HBM 容量 / GiB<input name="memory" type="number" min="0.1" step="0.1" value="80" required></label>
+            <label>预留比例 / %<input name="reserve" type="number" min="0" max="95" step="1" value="15" required></label>
+            <label>有效带宽 / GB/s<input name="bandwidth" type="number" min="0.1" step="0.1" value="2000" required></label>
+            <label>有效算力 / TFLOP/s<input name="compute" type="number" min="0.1" step="0.1" value="300" required></label>
+          </div>
+          <p class="form-note">有效带宽与算力应取相应形状、精度下的可达值；低位宽选项仅用于容量估算，不代表后端支持。</p>
+        </form>
+        <div class="calc-results" aria-live="polite"><div class="eyebrow">ESTIMATED / 非基准测试</div><div id="calc-output"></div></div>
+      </div>
+      <details class="formula-details"><summary>查看计算公式、算例与适用边界</summary><div class="formula-grid"><article><h4>容量</h4><code>Mweights ≈ P × weight_bits / 8</code><code>MKV = 2 × L × B × T × Hkv × dh × kv_bits / 8</code><p>常规 decoder 的 K、V 同形，B 条序列等长、无共享。变长请求应对各自长度求和；滑窗层按有效窗口计；MLA 应单独计算 latent 与 RoPE 缓存。</p></article><article><h4>Decode 简化下界</h4><code>Flinear ≈ 2 × P × B</code><code>Fattention ≈ 4 × L × B × Hq × T × dh</code><code>t ≥ max(F / C, bytes / BW)</code><p>本计算器只展示线性层计算项，以及权重读取一次 + 已有 KV 扫描一次的理想带宽项。未计 Attention FLOPs，因此二者最大值仍只是粗略下界；不含通信、scale、解量化、KV 写入和调度。</p></article><article><h4>Prefill 与成本</h4><code>Fprefill ≈ 2 × P × B × S + α × L × B × S² × D</code><code>cost/1M = 总小时成本 / 实测合格 tokens每小时 × 10⁶</code><p>α 取决于因果计算与 FLOPs 计数方式。使用端到端实测吞吐时，不应再次乘利用率；容量规划使用理论吞吐时，才单独建模有效利用率。</p></article></div></details>
+    </section>
+    <section id="roadmap" class="section-anchor">
+      <div class="section-heading"><div><div class="eyebrow">04 / BUILD YOUR EVIDENCE</div><h2>24 周，从框架到作品集</h2><p>按每周 8–12 小时规划；已有基础可跳过前四周，深度专精通常需要继续投入。</p></div></div>
+      <div id="timeline" class="timeline"></div>
+      <div class="project-heading"><h3>用六个项目把知识串起来</h3><span>无加速卡时先完成 CPU 模拟与分析；真实性能结论需要目标设备实测。</span></div>
+      <div id="projects" class="projects-grid"></div>
+      <details class="weekly-template"><summary>展开：可直接使用的每周实验记录模板</summary><pre>问题与假设：
+优化对象 / 预期瓶颈 / 可证伪条件：
+模型 revision、引擎 commit、硬件、驱动、后端、精度：
+负载：输入/输出长度分布、到达过程、并发、缓存命中率：
+基线与变体：单变量改变；预热、重复次数与随机种子：
+正确性：参考实现、容差、边界 case、长序列、多轮：
+质量：困惑度 + 任务指标 + 长上下文/代码/推理回归：
+性能：TTFT/ITL/TPOT 的 P50/P95/P99、goodput、峰值显存：
+归因：kernel 时间 / 带宽 / 计算 / 通信 / 排队：
+结论：SLO 下的收益、代价、失效区间、复现命令：
+下一步：最大不确定性，以及能消除它的最小实验：</pre></details>
+    </section>
+    <section id="frontier" class="section-anchor">
+      <div class="section-heading"><div><div class="eyebrow">05 / A LIVING VIEW</div><h2>理解演进，而非追逐名词</h2><p>以下是基于公开机制的研究假设，不是对未来产品或收益的承诺。</p></div></div>
+      <div class="evolution"><div><small>计算与 IO</small><strong>融合 · 分块 · 低精度</strong><p>让硬件有效执行现有计算。</p></div><span>→</span><div><small>状态与调度</small><strong>分页 · 复用 · 分层</strong><p>让请求与 KV 状态合理流动。</p></div><span>→</span><div><small>协同设计</small><strong>架构 × 编译 × 服务</strong><p>共同优化质量、延迟与成本。</p></div></div>
+      <div class="trend-table-wrap"><table class="trend-table"><caption>未来 6–24 个月的跟踪框架 · 以 2026-10-21 为整理日期</caption><thead><tr><th>方向与判断</th><th>为什么可能发生</th><th>验证指标 / 反例</th><th>把握程度</th></tr></thead><tbody id="trends"></tbody></table></div>
+      <div class="callout"><strong>每月一次“技术雷达”</strong><p>选一篇论文、一项引擎变更和一个真实负载，更新瓶颈假设。问四件事：减少了哪些 bytes / FLOPs？引入了什么状态和通信？质量在什么分布下退化？SLO 约束下是否仍降低成本？</p></div>
+    </section>
+    <section id="resources" class="section-anchor">
+      <div class="section-heading"><div><div class="eyebrow">06 / PRIMARY SOURCES</div><h2>从原始资料开始</h2><p>论文用于理解原理，官方文档与锁定版本的源码用于判断可用性。</p></div></div>
+      <div id="resource-grid" class="resource-grid"></div>
+      <div class="editorial-note"><h3>阅读边界与内容校正</h3><p>这是一份尽可能覆盖主要分支的学习地图，不宣称穷尽全部论文或未来技术。整理日期为 2026-10-21；动态文档可能是开发预览版，具体兼容性必须核对版本、后端和模型。网站不附虚构压测数据，公式输出均为简化估算。</p><ul><li>Prefill 既有随长度线性增长的投影/FFN，也有标准全注意力的平方项；Decode 也可能因长上下文、大 batch、MoE 通信转为其他瓶颈。</li><li>MLA 常降低 KV 访存、提高特定 kernel 的算术强度，但不必然计算受限；latent 在常见 head-TP 实现中会复制，不代表所有并行方案都不能分片。</li><li>Triton 的跨硬件可移植性需要对应编译后端与算子支持；TTIR → TTGIR → LLVM 是常见 GPU 路径，不能套用全部国产后端。</li><li>图捕获和 CUDA Graph 有形状、地址、控制流约束；“丢弃 guards”是特定受约束执行路径的策略，不是通用优化建议。</li><li>缓存复用必须匹配模型、位置、token 与适配器等身份；租户隔离与访问控制是系统正确性的一部分。</li></ul></div>
+    </section>
+    <footer><a class="brand-footer" href="#overview">iA / INFERENCE ATLAS</a><span>把每个优化结论，写成可复现的证据。</span><a href="#overview">回到顶部 ↑</a></footer>
+  </main>
+  <dialog id="topic-dialog" aria-labelledby="dialog-title"><div class="dialog-top"><span id="dialog-module" class="eyebrow"></span><button id="close-dialog" class="icon-button" aria-label="关闭详情">×</button></div><div id="dialog-content"></div></dialog>
+  <div id="toast" role="status" hidden></div>
+  <noscript><div class="noscript">此网站使用 JavaScript 展示交互大纲，请启用 JavaScript。完整文字大纲也可在同目录的 curriculum.js 中查看。</div></noscript>
+</body>
+</html>

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YXM 知识库 · 大模型推理优化</title>
+<meta name="description" content="从理解原理，到精通技术。通过技术报告、源码解读与实验记录，深入学习大模型推理优化。">
+<style>
+:root{--bg:#faf9f5;--surface:#ffffff;--ink:#141413;--muted:#6b6a65;--line:#e8e6dc;
+--accent:#d97757;--accent-2:#f38020;--soft:#f0eee6;
+--serif:"Tiempos Headline",Georgia,"Songti SC","Noto Serif SC",serif;
+--sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;
+-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.bar{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;
+justify-content:space-between;padding:0 24px;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar .site{font-family:var(--serif);font-size:16px;color:var(--ink)}
+.bar .site:hover{text-decoration:none}
+.btn{font:inherit;font-size:13px;cursor:pointer;border-radius:999px;padding:7px 16px;
+border:1px solid var(--ink);background:transparent;color:var(--ink)}
+.btn:hover{background:var(--soft)}
+.btn.on{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.hero{padding:96px 0 0}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.hero h1{font-family:var(--serif);font-weight:500;letter-spacing:-.025em;
+font-size:clamp(36px,6vw,72px);line-height:1.1;margin:18px 0 0;text-wrap:balance}
+.hero-translation{font-family:var(--serif);font-size:clamp(20px,3vw,32px);
+line-height:1.4;margin-top:12px}
+.lead{color:var(--muted);max-width:44ch;margin-top:16px}
+.vision{margin-top:34px;max-width:54ch;display:grid;gap:11px}
+.vision div{position:relative;padding-left:18px;font-size:14.5px;color:#3f3e3a}
+.vision div::before{content:"";position:absolute;left:0;top:11px;width:6px;height:6px;
+border-radius:50%;background:var(--accent)}
+.facts{display:flex;flex-wrap:wrap;gap:44px;margin:44px 0 0;padding-top:28px;
+border-top:1px solid var(--line)}
+.facts .v{font-family:var(--serif);font-size:clamp(28px,4vw,44px);color:var(--accent);line-height:1.1}
+.facts .l{font-size:12px;color:var(--muted);margin-top:6px}
+section.grp{margin-top:88px}
+.grp>h2{font-family:var(--serif);font-weight:500;font-size:clamp(28px,3.4vw,36px);letter-spacing:-.01em}
+.grp>.sub{color:var(--muted);font-size:14px;margin-top:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:28px}
+.card{position:relative;display:flex;flex-direction:column;background:var(--surface);
+border:1px solid var(--line);border-radius:16px;padding:24px;color:inherit}
+a.card:hover{border-color:var(--ink);text-decoration:none}
+.card .tag{align-self:flex-start;background:var(--soft);border-radius:999px;
+padding:3px 10px;font-size:12px;color:var(--muted);margin-bottom:12px}
+.card h3{font-family:var(--serif);font-weight:500;font-size:19px;line-height:1.35}
+.card .st{color:var(--muted);font-size:13px;margin-top:4px}
+.card .bd{font-size:14px;color:#3f3e3a;margin-top:12px;white-space:pre-line}
+.card .bd ul{margin:6px 0 0 18px}
+.card .note{background:var(--soft);border-left:3px solid var(--accent);
+padding:10px 12px;font-size:13px;color:var(--muted);margin-top:14px;border-radius:0 8px 8px 0}
+.card .go{margin-top:auto;padding-top:16px;font-size:13px;color:var(--accent)}
+.ops{position:absolute;top:14px;right:14px;display:none;gap:6px}
+body.edit .ops{display:flex}
+.ops button{border:1px solid var(--line);background:var(--surface);border-radius:8px;
+width:28px;height:28px;cursor:pointer;font-size:13px;color:var(--muted);line-height:1}
+.ops button:hover{border-color:var(--ink);color:var(--ink)}
+.add{display:none;align-items:center;justify-content:center;background:transparent;
+border:1px dashed var(--line);border-radius:16px;color:var(--muted);font:inherit;
+font-size:14px;cursor:pointer;min-height:120px}
+body.edit .add{display:flex}
+.add:hover{border-color:var(--accent);color:var(--accent)}
+.banner{background:var(--soft);border-left:3px solid var(--accent-2);padding:12px 16px;
+font-size:13px;color:var(--muted);margin-top:24px;border-radius:0 8px 8px 0}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);
+padding:0;max-width:560px;width:calc(100% - 40px)}
+dialog::backdrop{background:rgba(20,20,19,.38)}
+dialog form{padding:24px;display:flex;flex-direction:column;gap:12px}
+dialog h3{font-family:var(--serif);font-weight:500;font-size:20px}
+dialog label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+dialog input,dialog textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);
+border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+dialog textarea{min-height:92px;resize:vertical}
+dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
+dialog .pri{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+footer{border-top:1px solid var(--line);margin-top:96px;padding:28px 0 60px;
+color:var(--muted);font-size:12.5px}
+footer p+p{margin-top:4px}
+@media(max-width:600px){.hero{padding-top:56px}.wrap{padding:0 18px}
+.facts{gap:22px}.cards{grid-template-columns:1fr}section.grp{margin-top:56px}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="site" href="./index.html">YXM 知识库</a>
+  <button id="toggle" class="btn">编辑</button>
+</header>
+
+<section class="hero wrap">
+  <div class="eyebrow" id="eyebrow"></div>
+  <h1 lang="en">From Understanding to Mastery.</h1>
+  <p class="hero-translation">从理解原理，到精通技术。</p>
+  <p class="lead" id="lead"></p>
+  <div class="vision" id="vision"></div>
+  <div class="facts" id="facts"></div>
+  <div class="banner" id="banner" hidden></div>
+</section>
+
+<main class="wrap" id="groups"></main>
+
+<footer class="wrap">
+  <p>私有知识库。卡片与正文都存在 Supabase，打开即读最新版，任何人可在线编辑，改动实时同步到所有设备。</p>
+  <p>拿到前端 publishable key 的人都能读写这张表，因此只放公开信息，不要写入内部资料。</p>
+  <p id="foot-upd"></p>
+</footer>
+<dialog id="dlg"><form id="frm">
+  <h3 id="dlg-t">编辑卡片</h3>
+  <label>标题<input name="title" required></label>
+  <label>副标题<input name="subtitle"></label>
+  <label>标签<input name="tag"></label>
+  <label>正文（换行分段，“- ”开头成项目符号）<textarea name="body"></textarea></label>
+  <label>提示<input name="note"></label>
+  <label>链接（相对路径或 https 开头，留空则卡片不可点）<input name="href"></label>
+  <label>板块 key<input name="section" required></label>
+  <label>排序<input name="sort" type="number" step="10"></label>
+  <div class="row">
+    <button type="button" class="btn" id="cancel">取消</button>
+    <button type="submit" class="btn pri">保存</button>
+  </div>
+</form></dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const PAGE='yxm-kb-index';
+const SB_URL='https://jfvktpiumonhsgsgwbcc.supabase.co';
+const SB_KEY='sb_publishable_iwjdJ0BVThvZVEpq2t2tgw_OskNS6U1';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const UPDATED='2026-11-24';
+
+const SECTIONS={
+  series:{title:'DeepSeek 开源栈与 Flash 模型',sub:'从模型结构到推理引擎，再到 Agent 运行时'},
+  tools:{title:'学习地图与工具',sub:'长期维护、持续扩充的内容'}
+};
+
+const DEFAULTS=[
+  {section:'hero',sort:0,data:{
+    eyebrow:'大模型推理优化 · 个人知识库',
+    lead:'读过的报告、翻过的源码、跑出来的结论，不该散在几十个标签页和聊天记录里。',
+    vision:[
+      '每一句都写清来源：哪句来自官方报告，哪句来自源码第几行，哪句只是推断。',
+      '不确定就写不确定。猜一个具体数字，比承认不知道更糟。',
+      '结论会被推翻，推翻了就改；走过的弯路留一行，省得后来再走一次。',
+      '写给三个月后的自己——那时上下文已经忘干净，只剩这一页。'
+    ],
+    facts:[{label:'知识页',value:'5'},{label:'DeepSeek 开源栈',value:'4'},
+           {label:'正文字数',value:'11 万'},{label:'最后更新',value:'11-24'}]}},
+  {section:'series',sort:100,data:{
+    title:'DeepSeek-V4.1-Flash 及 Flash 模型关键优化点',
+    subtitle:'2.9 万字 · 10 章 · 20 张表',
+    tag:'模型结构',
+    body:'按 config 逐项推导 890 字节/token 的 KV 预算。\n- CED：上半 20 层的 global KV 从 encoder 输出投影\n- CSA2：40 层只有 4 个 main KV 生产层\n- 横向对比 MiMo、Qwen、GLM、Step 的 Flash 路线',
+    href:'article.html?p=flash'}},
+  {section:'series',sort:110,data:{
+    title:'DeepInfer 框架与创新点',
+    subtitle:'3.7 万字 · 19 章 · 40 段源码',
+    tag:'推理引擎',
+    body:'DeepSeek 生产推理引擎，源码 commit a679bb8。\n- 零开销异步调度（代码里叫 ZOS）\n- CSA2 三模式的 kernel 调用路径\n- DSpark 投机解码（代码里叫 DFlash）\n- 与 vLLM / SGLang / TRT-LLM 对比',
+    href:'article.html?p=deepinfer'}},
+  {section:'series',sort:120,data:{
+    title:'DeepSeek Harness 框架与创新点',
+    subtitle:'2.3 万字 · 12 章 · 18 段源码',
+    tag:'Agent 运行时',
+    body:'“一切皆插件”的 harness，源码 commit 4b399c39。\n- Cordis 插件架构与 agent loop\n- 请求一律从 session 日志派生\n- 工具流水线、沙箱与权限边界\n- 对 prefix cache 命中的影响',
+    href:'article.html?p=harness'}},
+  {section:'series',sort:130,data:{
+    title:'OpenRSI 框架与创新点',
+    subtitle:'2.5 万字 · 13 章 · 11 张表',
+    tag:'AI4AI',
+    body:'把“AI 改进 AI”做成可执行工程。\n- 搜索—经验—训练闭环\n- Frontis-MA1 的奖励与 credit assignment\n- MLE-Bench Lite 从 39.4% 到 71.2%\n- 同名项目辨析',
+    href:'article.html?p=openrsi',
+    note:'FrontisAI/OpenRSI 与 OpenRSI Foundation 未见组织关联。'}},
+  {section:'tools',sort:200,data:{
+    title:'推理优化知识概览',
+    subtitle:'交互式学习地图',
+    tag:'学习路径',
+    body:'从并行策略到 kernel 开发的学习地图，带前置依赖、动手练习与官方资料入口。',
+    href:'推理优化知识概览/index.html'}}
+];
+// 卡片 href 可被任何人改写，因此只接受相对路径或 http(s)，其余（javascript: 等）丢弃
+function safeHref(v){
+  if(typeof v!=='string') return '';
+  const s=v.trim();
+  if(!s) return '';
+  if(/^https?:\/\//i.test(s)) return s;
+  if(/^[^:]*$/.test(s) && !s.startsWith('//')) return s;
+  return '';
+}
+function bodyNodes(text){
+  const frag=document.createDocumentFragment();
+  let ul=null;
+  String(text||'').split('\n').forEach(raw=>{
+    const line=raw.trim();
+    if(line.startsWith('- ')){
+      if(!ul){ul=document.createElement('ul');frag.appendChild(ul);}
+      const li=document.createElement('li');li.textContent=line.slice(2);ul.appendChild(li);
+    }else{
+      ul=null;
+      if(!line) return;
+      const p=document.createElement('div');p.textContent=line;frag.appendChild(p);
+    }
+  });
+  return frag;
+}
+function banner(msg){const b=$('#banner');b.hidden=false;b.textContent=msg;}
+
+function renderHero(d){
+  $('#eyebrow').textContent=d.eyebrow||'';
+  $('#lead').textContent=d.lead||'';
+  const vz=$('#vision');vz.textContent='';
+  (d.vision||[]).forEach(line=>{
+    if(!line)return;
+    const el=document.createElement('div');el.textContent=line;vz.appendChild(el);
+  });
+  const f=$('#facts');f.textContent='';
+  (d.facts||[]).forEach(x=>{
+    const w=document.createElement('div');
+    const v=document.createElement('div');v.className='v';v.textContent=x.value||'';
+    const l=document.createElement('div');l.className='l';l.textContent=x.label||'';
+    w.append(v,l);f.appendChild(w);
+  });
+}
+function card(row){
+  const d=row.data||{};
+  const href=safeHref(d.href);
+  const el=document.createElement(href?'a':'div');
+  el.className='card';
+  if(href){el.href=href;}
+  if(d.tag){const t=document.createElement('span');t.className='tag';t.textContent=d.tag;el.appendChild(t);}
+  const h=document.createElement('h3');h.textContent=d.title||'（未命名）';el.appendChild(h);
+  if(d.subtitle){const s=document.createElement('div');s.className='st';s.textContent=d.subtitle;el.appendChild(s);}
+  if(d.body){const b=document.createElement('div');b.className='bd';b.appendChild(bodyNodes(d.body));el.appendChild(b);}
+  if(d.note){const n=document.createElement('div');n.className='note';n.textContent=d.note;el.appendChild(n);}
+  if(href){const g=document.createElement('div');g.className='go';g.textContent='打开 →';el.appendChild(g);}
+
+  const ops=document.createElement('div');ops.className='ops';
+  const ed=document.createElement('button');ed.type='button';ed.textContent='✎';ed.title='编辑';
+  ed.onclick=e=>{e.preventDefault();e.stopPropagation();openDlg(row);};
+  const rm=document.createElement('button');rm.type='button';rm.textContent='×';rm.title='删除';
+  rm.onclick=async e=>{
+    e.preventDefault();e.stopPropagation();
+    if(!confirm('删除卡片「'+(d.title||'')+'」？')) return;
+    const {error}=await sb.from('pages_blocks').delete().eq('id',row.id);
+    if(error) banner('删除失败：'+error.message); else refresh();
+  };
+  ops.append(ed,rm);el.appendChild(ops);
+  return el;
+}
+
+function render(rows){
+  const hero=rows.find(r=>r.section==='hero');
+  renderHero(hero?hero.data:DEFAULTS[0].data);
+  const box=$('#groups');box.textContent='';
+  const groups=new Map();
+  rows.filter(r=>r.section!=='hero').forEach(r=>{
+    if(!groups.has(r.section)) groups.set(r.section,[]);
+    groups.get(r.section).push(r);
+  });
+  const order=[...groups.entries()].sort((a,b)=>
+    Math.min(...a[1].map(r=>r.sort??1000))-Math.min(...b[1].map(r=>r.sort??1000)));
+  order.forEach(([key,list])=>{
+    const sec=document.createElement('section');sec.className='grp';
+    const meta=SECTIONS[key]||{title:key,sub:''};
+    const h2=document.createElement('h2');h2.textContent=meta.title;sec.appendChild(h2);
+    if(meta.sub){const s=document.createElement('div');s.className='sub';s.textContent=meta.sub;sec.appendChild(s);}
+    const grid=document.createElement('div');grid.className='cards';
+    list.sort((a,b)=>(a.sort??1000)-(b.sort??1000)).forEach(r=>grid.appendChild(card(r)));
+    const add=document.createElement('button');add.className='add';add.type='button';
+    add.textContent='＋ 添加卡片';
+    add.onclick=()=>openDlg({section:key,sort:(Math.max(...list.map(r=>r.sort??1000))+10),data:{}});
+    grid.appendChild(add);
+    sec.appendChild(grid);box.appendChild(sec);
+  });
+  $('#foot-upd').textContent='卡片与正文实时来自 Supabase；本页框架最后更新 '+UPDATED+'。';
+}
+
+let editing=null;
+function openDlg(row){
+  editing=row;
+  const d=row.data||{};
+  const f=$('#frm');
+  $('#dlg-t').textContent=row.id?'编辑卡片':'添加卡片';
+  f.title.value=d.title||'';f.subtitle.value=d.subtitle||'';f.tag.value=d.tag||'';
+  f.body.value=d.body||'';f.note.value=d.note||'';f.href.value=d.href||'';
+  f.section.value=row.section||'series';f.sort.value=row.sort??1000;
+  $('#dlg').showModal();
+}
+$('#cancel').onclick=()=>$('#dlg').close();
+$('#frm').onsubmit=async e=>{
+  e.preventDefault();
+  const f=e.target;
+  const data={title:f.title.value.trim(),subtitle:f.subtitle.value.trim(),
+    tag:f.tag.value.trim(),body:f.body.value,note:f.note.value.trim(),
+    href:f.href.value.trim()};
+  Object.keys(data).forEach(k=>{if(!data[k]) delete data[k];});
+  const rec={section:f.section.value.trim()||'series',sort:Number(f.sort.value)||1000,data};
+  const {error}=editing&&editing.id
+    ? await sb.from('pages_blocks').update(rec).eq('id',editing.id)
+    : await sb.from('pages_blocks').insert({page:PAGE,...rec});
+  $('#dlg').close();
+  if(error) banner('保存失败：'+error.message); else refresh();
+};
+$('#toggle').onclick=()=>{
+  const on=document.body.classList.toggle('edit');
+  $('#toggle').classList.toggle('on',on);
+  $('#toggle').textContent=on?'完成':'编辑';
+};
+
+async function load(){
+  let {data,error}=await sb.from('pages_blocks').select('*').eq('page',PAGE);
+  if(error){
+    banner('未连上 Supabase，下面显示的是页面内置的默认卡片：'+error.message);
+    return render(DEFAULTS.map((d,i)=>({id:'local-'+i,...d})));
+  }
+  if(!data.length){
+    const {error:e2}=await sb.from('pages_blocks').insert(DEFAULTS.map(d=>({page:PAGE,...d})));
+    if(e2){
+      banner('首次写入种子数据失败，先按内置默认渲染：'+e2.message);
+      return render(DEFAULTS.map((d,i)=>({id:'local-'+i,...d})));
+    }
+    ({data}=await sb.from('pages_blocks').select('*').eq('page',PAGE));
+  }
+  render(data||[]);
+}
+const refresh=load;
+
+sb.channel('kb-'+PAGE)
+  .on('postgres_changes',{event:'*',schema:'public',table:'pages_blocks'},refresh)
+  .subscribe();
+load();
+</script>
+</body>
+</html>
