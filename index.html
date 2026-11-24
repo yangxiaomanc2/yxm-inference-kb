@@ -4,13 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>YXM 知识库 · 大模型推理优化</title>
-<meta name="description" content="从理解原理，到精通技术。通过技术报告、源码解读与实验记录，深入学习大模型推理优化。">
+<meta name="description" content="通过技术报告、源码解读与实验记录，深入学习大模型推理优化。">
 <style>
 :root{--bg:#faf9f5;--surface:#ffffff;--ink:#141413;--muted:#6b6a65;--line:#e8e6dc;
 --accent:#d97757;--accent-2:#f38020;--soft:#f0eee6;
 --serif:"Tiempos Headline",Georgia,"Songti SC","Noto Serif SC",serif;
 --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif}
 *{box-sizing:border-box;margin:0;padding:0}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;
 -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 a{color:var(--accent);text-decoration:none}
@@ -24,13 +27,45 @@ border:1px solid var(--ink);background:transparent;color:var(--ink)}
 .btn:hover{background:var(--soft)}
 .btn.on{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
 .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-.hero{padding:96px 0 0}
+.hero {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 6vw, 96px);
+  text-align: center;
+}
+.hero h1 {
+  max-width: 22ch;
+  font: 400 clamp(2.5rem, 7.5vw, 7rem)/1.03 var(--serif);
+  letter-spacing: -.045em;
+  text-wrap: balance;
+}
+.hero-translation {
+  display: block;
+  margin-top: .9em;
+  font-size: clamp(1.125rem, 2.7vw, 2rem);
+  line-height: 1.5;
+  letter-spacing: .02em;
+}
+.start {
+  display: inline-grid;
+  place-items: center;
+  min-height: 48px;
+  margin-top: clamp(28px, 4.5vw, 52px);
+  padding: 10px 30px;
+  border-radius: 8px;
+  background: #a54830;
+  color: #fff;
+  font-weight: 600;
+}
+.start:hover { background: #873a27; text-decoration: none; }
+.start:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+#contents { min-height: 100vh; }
+.catalog { padding-top: clamp(24px, 5vw, 48px); padding-bottom: 60px; }
 .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
-.hero h1{font-family:var(--serif);font-weight:500;letter-spacing:-.025em;
-font-size:clamp(36px,6vw,72px);line-height:1.1;margin:18px 0 0;text-wrap:balance}
-.hero-translation{font-family:var(--serif);font-size:clamp(20px,3vw,32px);
-line-height:1.4;margin-top:12px}
 section.grp{margin-top:88px}
+#groups > .grp:first-child { margin-top: 12px; }
 .grp>h2{font-family:var(--serif);font-weight:500;font-size:clamp(28px,3.4vw,36px);letter-spacing:-.01em}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:28px}
 .card{position:relative;display:flex;flex-direction:column;background:var(--surface);
@@ -68,28 +103,37 @@ border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
 dialog textarea{min-height:92px;resize:vertical}
 dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
 dialog .pri{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
-main.wrap{padding-bottom:60px}
 .edit-note{display:none;margin-top:24px;color:var(--muted);font-size:13px}
 body.edit .edit-note{display:block}
-@media(max-width:600px){.hero{padding-top:56px}.wrap{padding:0 18px}
+@media(max-width:600px){.wrap{padding-inline:18px}
 .cards{grid-template-columns:1fr}section.grp{margin-top:56px}}
 </style>
 </head>
 <body>
-<header class="bar">
-  <a class="site" href="./index.html">YXM 知识库</a>
-  <button id="toggle" class="btn">编辑</button>
-</header>
+<main>
+  <section class="hero" aria-labelledby="home-title">
+    <div>
+      <h1 id="home-title">
+        <span lang="en">Our Next Chapter Starts Here.</span>
+        <span class="hero-translation">我们的下一篇章，从这里开始。</span>
+      </h1>
+      <a class="start" href="#contents" lang="en">Start</a>
+    </div>
+  </section>
 
-<section class="hero wrap">
-  <div class="eyebrow" id="eyebrow"></div>
-  <h1 lang="en">From Understanding to Mastery.</h1>
-  <p class="hero-translation">从理解原理，到精通技术。</p>
-  <p class="edit-note">编辑内容公开可见，请勿写入内部资料。</p>
-  <div class="banner" id="banner" hidden></div>
-</section>
-
-<main class="wrap" id="groups"></main>
+  <section id="contents" tabindex="-1" aria-labelledby="catalog-title">
+    <header class="bar">
+      <a class="site" id="catalog-title" href="./">YXM 知识库</a>
+      <button id="toggle" class="btn">编辑</button>
+    </header>
+    <div class="wrap catalog">
+      <div class="eyebrow" id="eyebrow"></div>
+      <p class="edit-note">编辑内容公开可见，请勿写入内部资料。</p>
+      <div class="banner" id="banner" hidden></div>
+      <div id="groups"></div>
+    </div>
+  </section>
+</main>
 
 <dialog id="dlg"><form id="frm">
   <h3 id="dlg-t">编辑卡片</h3>
