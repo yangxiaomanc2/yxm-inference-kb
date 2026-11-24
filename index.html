@@ -30,18 +30,8 @@ border:1px solid var(--ink);background:transparent;color:var(--ink)}
 font-size:clamp(36px,6vw,72px);line-height:1.1;margin:18px 0 0;text-wrap:balance}
 .hero-translation{font-family:var(--serif);font-size:clamp(20px,3vw,32px);
 line-height:1.4;margin-top:12px}
-.lead{color:var(--muted);max-width:44ch;margin-top:16px}
-.vision{margin-top:34px;max-width:54ch;display:grid;gap:11px}
-.vision div{position:relative;padding-left:18px;font-size:14.5px;color:#3f3e3a}
-.vision div::before{content:"";position:absolute;left:0;top:11px;width:6px;height:6px;
-border-radius:50%;background:var(--accent)}
-.facts{display:flex;flex-wrap:wrap;gap:44px;margin:44px 0 0;padding-top:28px;
-border-top:1px solid var(--line)}
-.facts .v{font-family:var(--serif);font-size:clamp(28px,4vw,44px);color:var(--accent);line-height:1.1}
-.facts .l{font-size:12px;color:var(--muted);margin-top:6px}
 section.grp{margin-top:88px}
 .grp>h2{font-family:var(--serif);font-weight:500;font-size:clamp(28px,3.4vw,36px);letter-spacing:-.01em}
-.grp>.sub{color:var(--muted);font-size:14px;margin-top:6px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:28px}
 .card{position:relative;display:flex;flex-direction:column;background:var(--surface);
 border:1px solid var(--line);border-radius:16px;padding:24px;color:inherit}
@@ -78,11 +68,11 @@ border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
 dialog textarea{min-height:92px;resize:vertical}
 dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
 dialog .pri{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
-footer{border-top:1px solid var(--line);margin-top:96px;padding:28px 0 60px;
-color:var(--muted);font-size:12.5px}
-footer p+p{margin-top:4px}
+main.wrap{padding-bottom:60px}
+.edit-note{display:none;margin-top:24px;color:var(--muted);font-size:13px}
+body.edit .edit-note{display:block}
 @media(max-width:600px){.hero{padding-top:56px}.wrap{padding:0 18px}
-.facts{gap:22px}.cards{grid-template-columns:1fr}section.grp{margin-top:56px}}
+.cards{grid-template-columns:1fr}section.grp{margin-top:56px}}
 </style>
 </head>
 <body>
@@ -95,19 +85,12 @@ footer p+p{margin-top:4px}
   <div class="eyebrow" id="eyebrow"></div>
   <h1 lang="en">From Understanding to Mastery.</h1>
   <p class="hero-translation">从理解原理，到精通技术。</p>
-  <p class="lead" id="lead"></p>
-  <div class="vision" id="vision"></div>
-  <div class="facts" id="facts"></div>
+  <p class="edit-note">编辑内容公开可见，请勿写入内部资料。</p>
   <div class="banner" id="banner" hidden></div>
 </section>
 
 <main class="wrap" id="groups"></main>
 
-<footer class="wrap">
-  <p>私有知识库。卡片与正文都存在 Supabase，打开即读最新版，任何人可在线编辑，改动实时同步到所有设备。</p>
-  <p>拿到前端 publishable key 的人都能读写这张表，因此只放公开信息，不要写入内部资料。</p>
-  <p id="foot-upd"></p>
-</footer>
 <dialog id="dlg"><form id="frm">
   <h3 id="dlg-t">编辑卡片</h3>
   <label>标题<input name="title" required></label>
@@ -131,25 +114,14 @@ const SB_URL='https://jfvktpiumonhsgsgwbcc.supabase.co';
 const SB_KEY='sb_publishable_iwjdJ0BVThvZVEpq2t2tgw_OskNS6U1';
 const sb=window.supabase.createClient(SB_URL,SB_KEY);
 const $=s=>document.querySelector(s);
-const UPDATED='2026-11-24';
 
 const SECTIONS={
-  series:{title:'DeepSeek 开源栈与 Flash 模型',sub:'从模型结构到推理引擎，再到 Agent 运行时'},
-  tools:{title:'学习地图与工具',sub:'长期维护、持续扩充的内容'}
+  series:'DeepSeek 开源栈与 Flash 模型',
+  tools:'学习地图与工具'
 };
 
 const DEFAULTS=[
-  {section:'hero',sort:0,data:{
-    eyebrow:'大模型推理优化 · 个人知识库',
-    lead:'读过的报告、翻过的源码、跑出来的结论，不该散在几十个标签页和聊天记录里。',
-    vision:[
-      '每一句都写清来源：哪句来自官方报告，哪句来自源码第几行，哪句只是推断。',
-      '不确定就写不确定。猜一个具体数字，比承认不知道更糟。',
-      '结论会被推翻，推翻了就改；走过的弯路留一行，省得后来再走一次。',
-      '写给三个月后的自己——那时上下文已经忘干净，只剩这一页。'
-    ],
-    facts:[{label:'知识页',value:'5'},{label:'DeepSeek 开源栈',value:'4'},
-           {label:'正文字数',value:'11 万'},{label:'最后更新',value:'11-24'}]}},
+  {section:'hero',sort:0,data:{eyebrow:'大模型推理优化 · 个人知识库'}},
   {section:'series',sort:100,data:{
     title:'DeepSeek-V4.1-Flash 及 Flash 模型关键优化点',
     subtitle:'2.9 万字 · 10 章 · 20 张表',
@@ -209,22 +181,6 @@ function bodyNodes(text){
 }
 function banner(msg){const b=$('#banner');b.hidden=false;b.textContent=msg;}
 
-function renderHero(d){
-  $('#eyebrow').textContent=d.eyebrow||'';
-  $('#lead').textContent=d.lead||'';
-  const vz=$('#vision');vz.textContent='';
-  (d.vision||[]).forEach(line=>{
-    if(!line)return;
-    const el=document.createElement('div');el.textContent=line;vz.appendChild(el);
-  });
-  const f=$('#facts');f.textContent='';
-  (d.facts||[]).forEach(x=>{
-    const w=document.createElement('div');
-    const v=document.createElement('div');v.className='v';v.textContent=x.value||'';
-    const l=document.createElement('div');l.className='l';l.textContent=x.label||'';
-    w.append(v,l);f.appendChild(w);
-  });
-}
 function card(row){
   const d=row.data||{};
   const href=safeHref(d.href);
@@ -254,7 +210,7 @@ function card(row){
 
 function render(rows){
   const hero=rows.find(r=>r.section==='hero');
-  renderHero(hero?hero.data:DEFAULTS[0].data);
+  $('#eyebrow').textContent=hero?.data?.eyebrow||DEFAULTS[0].data.eyebrow;
   const box=$('#groups');box.textContent='';
   const groups=new Map();
   rows.filter(r=>r.section!=='hero').forEach(r=>{
@@ -265,9 +221,8 @@ function render(rows){
     Math.min(...a[1].map(r=>r.sort??1000))-Math.min(...b[1].map(r=>r.sort??1000)));
   order.forEach(([key,list])=>{
     const sec=document.createElement('section');sec.className='grp';
-    const meta=SECTIONS[key]||{title:key,sub:''};
-    const h2=document.createElement('h2');h2.textContent=meta.title;sec.appendChild(h2);
-    if(meta.sub){const s=document.createElement('div');s.className='sub';s.textContent=meta.sub;sec.appendChild(s);}
+    const title=Object.hasOwn(SECTIONS,key)?SECTIONS[key]:key;
+    const h2=document.createElement('h2');h2.textContent=title;sec.appendChild(h2);
     const grid=document.createElement('div');grid.className='cards';
     list.sort((a,b)=>(a.sort??1000)-(b.sort??1000)).forEach(r=>grid.appendChild(card(r)));
     const add=document.createElement('button');add.className='add';add.type='button';
@@ -276,7 +231,6 @@ function render(rows){
     grid.appendChild(add);
     sec.appendChild(grid);box.appendChild(sec);
   });
-  $('#foot-upd').textContent='卡片与正文实时来自 Supabase；本页框架最后更新 '+UPDATED+'。';
 }
 
 let editing=null;
