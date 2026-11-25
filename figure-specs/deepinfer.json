@@ -1,0 +1,1058 @@
+[
+ {
+  "anchor": "                 examples/offline_infere",
+  "kind": "arch",
+  "title": "DeepInfer 的进程与模块分层",
+  "caption": "据第 2.1 节分层图绘制，省略了 SO matcher builder、StatsLogger 和 GPUCacheInterface / KVCacheManager 等内部组件。",
+  "stages": [
+   [
+    "Entrypoints",
+    "blue",
+    [
+     "offline_inference.py / benchmark.py / eval",
+     "entrypoints/llm.py (LLM)"
+    ],
+    "示例、评测脚本通过 LLM 类进入引擎。"
+   ],
+   [
+    "LLMEngine",
+    "gray",
+    [
+     "add_request / step()",
+     "DeferredRelease"
+    ],
+    "llm_engine.py 负责主循环，调用调度器并通过 _run_workers 驱动 Worker。"
+   ],
+   [
+    "C++ Scheduler",
+    "ochre",
+    [
+     "BlockManager (paged KV)",
+     "state_manager (StateBlock slot)",
+     "MTPVarlen / FlopsEstimator",
+     "DP allreduce 投票 (gloo / NCCL)"
+    ],
+    "scheduler.hpp 决定每一步调度哪些序列以及各自的 seqlen_q。"
+   ],
+   [
+    "driver Worker",
+    "purple",
+    [
+     "ModelRunner / CudaGraphRunner",
+     "prepare_tensor_input_v4.cpp",
+     "DeepseekForCausalLM + DFlash",
+     "ZOS: prev_step_state / seqlens 修正"
+    ],
+    "driver Worker 执行 execute_model_step，完成输入准备、forward 和采样。"
+   ],
+   [
+    "follower Workers",
+    "gray",
+    [
+     "shm_broadcast",
+     "CP 组内 MessageQueue"
+    ],
+    "同 CP 组的其他 rank 通过共享内存广播接收 driver 的输入。"
+   ],
+   [
+    "Attention kernels",
+    "purple",
+    [
+     "FlashMLA",
+     "DeepGEMM MQA logits",
+     "DeepSelect topk"
+    ],
+    "注意力与 indexer 打分、Top-K 选择所用的 kernel。"
+   ],
+   [
+    "MoE / GEMM / 通用 kernels",
+    "orange",
+    [
+     "DeepGEMM Mega MoE / GEMM",
+     "DeepEP dispatch/combine, BucketBuffer",
+     "TileKernels",
+     "TileLang ops (cuda/ 与 asc/)"
+    ],
+    "MoE、GEMM 与通用算子 kernel，TileLang ops 有 cuda 和 asc 两套后端。"
+   ]
+  ]
+ },
+ {
+  "anchor": "\"num_hidden_layers\": 40, \"sliding_window",
+  "kind": "arch",
+  "title": "CSA2 的三张层间共享映射",
+  "reuse": true
+ },
+ {
+  "anchor": "# deepinfer/hugging_face/config.py:62-65",
+  "kind": "code",
+  "title": "HF config 如何生成层间共享映射",
+  "path": "deepinfer/hugging_face/config.py",
+  "first": 62,
+  "last": 85,
+  "steps": [
+   [
+    "最近源层映射",
+    "62-65",
+    "_source_map 把从首个 source 层开始的每一层映射到不晚于它的最近 source 层。"
+   ],
+   [
+    "读层数与候选源",
+    "68-70",
+    "_shared_layer_cfg 读取 num_hidden_layers 和 candidate_source_layer_id。"
+   ],
+   [
+    "三张段式映射",
+    "71-75",
+    "用 index、kv、index-K 三组 source 层号分别生成 layer_index_module_map、layer_kv_map、layer_index_k_map，未配置 index-K source 时沿用 kv source。"
+   ],
+   [
+    "候选池映射",
+    "76-77",
+    "配置了候选源层时，把它及之后的所有层都映射到该候选源层。"
+   ],
+   [
+    "候选配置",
+    "78-85",
+    "为候选源层记录 candidate_topk_blocks、candidate_block_size 和 max 归约方式后返回。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/cross_layer.py:114-117\n        n_pr",
+  "kind": "code",
+  "title": "SharedLayerTopology 如何校验层间共享拓扑",
+  "path": "deepinfer/model_executor/models/v4_modules/cross_layer.py",
+  "first": 97,
+  "last": 118,
+  "steps": [
+   [
+    "遍历三张映射",
+    "97-102",
+    "依次对 index-topk、index-k、kv 三张映射做段式结构校验。"
+   ],
+   [
+    "跳过源层",
+    "103-105",
+    "映射到自身的层是 source 层，不需要进一步检查。"
+   ],
+   [
+    "消费层须有配置",
+    "106-113",
+    "被标为 consumer 的层必须带 layer_info_shared_cfg，否则 cache engine 会给它分配一块从未写入的独立 cache，所以这里直接断言失败。"
+   ],
+   [
+    "YOCO 边界",
+    "114-116",
+    "share-kv 不能跨越 YOCO 压缩边界：第 n_prefill_layer 层必须是自己的 kv source。"
+   ],
+   [
+    "其余校验",
+    "117-118",
+    "继续检查 index 与 kv 的兼容性以及候选池配置。"
+   ]
+  ]
+ },
+ {
+  "anchor": "LLMEngine.step()                        ",
+  "kind": "arch",
+  "title": "LLMEngine.step() 一个 step 的调用链",
+  "caption": "据第 3.1 节调用链（llm_engine.py:860-959、worker.py:89-189）绘制，省略了 _execute_model_async_step 的转发层和 follower Worker。",
+  "stages": [
+   [
+    "scheduler.schedule",
+    "ochre",
+    [
+     "C++，释放 GIL",
+     "返回 seq_metadata_list + SchedulerOutputs"
+    ],
+    "step() 先调用 C++ 调度器决定本步的 batch。"
+   ],
+   [
+    "状态准备",
+    "gray",
+    [
+     "clone / zero states & blocks",
+     "post_schedule / SO 状态检查",
+     "copy_state（decode 期 SWA 副本）"
+    ],
+    "处理 fork 请求、zero-state 重算以及用于落盘的 SWA 副本。"
+   ],
+   [
+    "forward(N)",
+    "purple",
+    [
+     "ModelRunner.execute_main_model",
+     "forbid_cuda_sync"
+    ],
+    "Worker.execute_model_step 先发射第 N 步的模型 forward。"
+   ],
+   [
+    "post_process(N-1)",
+    "gray",
+    [
+     "等待上一步 sample_end_evt",
+     "回调 LLMEngine.post_process"
+    ],
+    "GPU 执行第 N 步 forward 时，CPU 处理上一步的输出。"
+   ],
+   [
+    "sample(N)",
+    "green",
+    [
+     "ModelRunner.execute_sample",
+     "pre_sampler_sync: DeferredRelease.release",
+     "save kvcache / SO pump"
+    ],
+    "发射第 N 步的采样，采样前释放上一轮推迟的资源。"
+   ],
+   [
+    "ZOS 分支",
+    "ochre",
+    [
+     "ZOS decode：post_process(N) 推迟到下一步",
+     "prompt 或 non-ZOS：当场处理"
+    ],
+    "ZOS 下 decode 步的后处理与下一步 forward 重叠。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/worker/worker.py:143-144, 18",
+  "kind": "arch",
+  "title": "ZOS 的跨步执行",
+  "reuse": true
+ },
+ {
+  "anchor": "# deepinfer/worker/worker.py:209-227\n   ",
+  "kind": "code",
+  "title": "ZOS 下如何在 GPU 上修正滞后一步的 seqlens",
+  "path": "deepinfer/worker/worker.py",
+  "first": 197,
+  "last": 227,
+  "steps": [
+   [
+    "无上一步则跳过",
+    "197-200",
+    "上一步状态为空或只是占位时，不需要修正。"
+   ],
+   [
+    "含 padding 行数",
+    "202-207",
+    "decode 走 CUDA graph 时，按选中的 graph batch size 算出含 padding 的序列数。"
+   ],
+   [
+    "CPU 侧 remap",
+    "209-213",
+    "prepare_zos_inputs 生成上一步到本步的行映射 remap 和保守的 seqlens_q/k，两步 batch 无交集时直接返回。"
+   ],
+   [
+    "异步拷到 GPU",
+    "214-216",
+    "以 non_blocking 方式把 remap 和 seqlens 拷到显存，CPU 不等待。"
+   ],
+   [
+    "按置信度改 q",
+    "218-219",
+    "开启 MTP varlen 时，用上一步留在显存的 confidence_rates_gpu 重新计算每个请求的 seqlens_q。"
+   ],
+   [
+    "按接受数改 k",
+    "220-227",
+    "有 draft 时，用上一步的 num_accepted_tokens_gpu 在 GPU 上修正 seqlens_k。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// csrc/engine/scheduler.hpp:308-322\n   ",
+  "kind": "code",
+  "title": "DP 调度器如何决定是否做 Prefill",
+  "reuse": true
+ },
+ {
+  "anchor": "// csrc/engine/scheduler.hpp:622-643（节选）",
+  "kind": "code",
+  "title": "Decode 调度如何按 LCFS 分配与抢占",
+  "path": "csrc/engine/scheduler.hpp",
+  "first": 622,
+  "last": 652,
+  "steps": [
+   [
+    "按输出长度排序",
+    "622-625",
+    "running 按输出长度降序排列，代码注释称之为 LCFS。"
+   ],
+   [
+    "从尾部调度",
+    "626-629",
+    "用双指针 l/r 从尾部（输出最短的请求）开始取序列，直到达到 max_seqs。"
+   ],
+   [
+    "从头部抢占",
+    "630-634",
+    "KV block 不够时从头部（输出最长的请求）抢占，直到能分配或只剩当前序列。"
+   ],
+   [
+    "分配或自抢占",
+    "635-643",
+    "能分配就追加 slot 并放入 scheduled，否则抢占当前序列本身。"
+   ],
+   [
+    "检查并清空",
+    "645-646",
+    "断言 running 中的序列都已处理，然后清空 running。"
+   ],
+   [
+    "按总长重排",
+    "648-652",
+    "scheduled 按序列总长度降序重排，再交给 _mtp_varlen.schedule 计算每个请求的 seqlen_q。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// csrc/engine/scheduler.hpp:696-700\n   ",
+  "kind": "code",
+  "title": "schedule() 收尾如何计算 seqlen_k 与位置上界",
+  "path": "csrc/engine/scheduler.hpp",
+  "first": 688,
+  "last": 710,
+  "steps": [
+   [
+    "初始化",
+    "688-691",
+    "创建元数据列表，max_seqlen_q 取 nextn + 1。"
+   ],
+   [
+    "取 golden token",
+    "692-695",
+    "对每个被调度的序列累加调度次数，并取下一批 golden token。"
+   ],
+   [
+    "含在途的 seqlen_k",
+    "696-697",
+    "seqlen_k 等于已缓存 token 数加在途 token 数再加本步 seqlen_q。"
+   ],
+   [
+    "位置上界",
+    "698-700",
+    "prefill 止于 seqlen_k；decode 按 max_seqlen_q 取保守上界，再加 nextn 个 draft 位置。"
+   ],
+   [
+    "越界检查",
+    "701-705",
+    "position_end 不得超过 runtime_max_model_len，否则报出请求的各项长度。"
+   ],
+   [
+    "池化分配",
+    "706-710",
+    "从 SequenceMetadataPool 分配元数据对象，并累计 sum_seqlen_qxk 与 max_seqlen_k。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/worker/cache_engine.py:205-2",
+  "kind": "code",
+  "title": "每层 KVCache 由哪五类对象组成",
+  "path": "deepinfer/worker/cache_engine.py",
+  "first": 205,
+  "last": 218,
+  "steps": [
+   [
+    "indexer K",
+    "207-208",
+    "ica_cache 按 block 存 indexer K，每个 block 有 block_size // ratio 个 token，按 uint8 存储。"
+   ],
+   [
+    "indexer state",
+    "209-210",
+    "ica_state 是每个序列一份的 fp32 压缩边界累加器。"
+   ],
+   [
+    "main KV",
+    "211-213",
+    "ca_cache 存压缩后的 main KV，V41 每 token 存 [data | scale]，per-16 FP4 为 288 字节，MXFP8 为 528 字节。"
+   ],
+   [
+    "main state",
+    "214-215",
+    "ca_state 是 main KV 压缩器的 fp32 状态。"
+   ],
+   [
+    "SWA cache",
+    "216-218",
+    "swa_cache 按序列存滑窗 KV，每 token 528 字节：512B FP8 数据加 16B UE8M0 scale。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/worker/cache_engine.py:428-4",
+  "kind": "code",
+  "title": "KVCacheManager 如何用视图别名实现层间共享",
+  "path": "deepinfer/worker/cache_engine.py",
+  "first": 424,
+  "last": 461,
+  "steps": [
+   [
+    "index K 共享",
+    "424-431",
+    "index K 是否复用只由 index-K map 决定；映射到别层时直接引用那一层的 ica_cache，不推进 offset。"
+   ],
+   [
+    "切 index K 视图",
+    "432-439",
+    "本层拥有 index K 时，从 gpu_blocks 的当前 offset 切出视图，并按 32 字节对齐推进 offset。"
+   ],
+   [
+    "index state",
+    "441-443",
+    "只有需要压缩 state 的独立 indexer 才分配 ica_state。"
+   ],
+   [
+    "main KV 共享",
+    "445-449",
+    "main KV 是否复用只由 kv map 决定；被共享的层直接引用 source 层的 ca_cache。"
+   ],
+   [
+    "切 main KV 视图",
+    "450-461",
+    "source 层按 block_size // ratio 计算每 block 的 token 数，用 as_strided 切出视图并推进 offset。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/worker/cache_engine.py:221-2",
+  "kind": "arch",
+  "title": "StateBlock 中一个序列的 state 布局",
+  "caption": "据 cache_engine.py:221-235 的 StateBlock docstring、113-116 的分区判据和第 5.4 节的表格绘制，从低地址到高地址排列，省略了各区内部的字节偏移。",
+  "stages": [
+   [
+    "Stored: SWA",
+    "ochre",
+    [
+     "encoder SWA（前 20 层中有 SWA 的层）",
+     "需要落盘"
+    ],
+    "需要落盘的 SWA state 放在低地址的 stored 区。"
+   ],
+   [
+    "Dropped: consumer SWA",
+    "ochre",
+    [
+     "decoder SWA（第 20-39 层）",
+     "layer_id >= n_prefill_layer"
+    ],
+    "YOCO consumer 层的 SWA 不落盘，每次 prefill 由 decoder bounded replay 生成。"
+   ],
+   [
+    "Dropped: compression state",
+    "ochre",
+    [
+     "ca_state / ica_state",
+     "压缩边界累加器"
+    ],
+    "压缩 state 没有跨落盘边界的依赖，也放在 dropped 区。"
+   ],
+   [
+    "落盘与传输",
+    "green",
+    [
+     "to disk：前 state_size_to_disk 字节",
+     "PE→CE：传输两部分"
+    ],
+    "落盘按长度截断即可排除整个 dropped 区，PE→CE 传输则包含两部分。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/attn.py:292：只有 ",
+  "kind": "code",
+  "title": "V4Attention 如何按共享拓扑构造本层模块",
+  "path": "deepinfer/model_executor/models/v4_modules/attn.py",
+  "first": 345,
+  "last": 371,
+  "steps": [
+   [
+    "kv source 压缩器",
+    "345-347",
+    "只有 kv source 层才构造 Compressor(PackedWkv)，并校验压缩率一致。"
+   ],
+   [
+    "收集 KV 权重",
+    "348",
+    "c1 层只取 A 权重，其他压缩率还要加上 Gate 权重。"
+   ],
+   [
+    "yoco 投影分流",
+    "349-352",
+    "yoco hidden consumer 层把 KV 权重单独留给 shared hidden 投影，其他层并入当前 hidden 的合并投影。"
+   ],
+   [
+    "本层 indexer",
+    "354-364",
+    "只有 has_local_index 的层才构造 MQA indexer，是否存 index K 由 is_index_k_source 决定。"
+   ],
+   [
+    "合并投影",
+    "366-371",
+    "把当前 hidden 需要的各部分权重合并成一个 projection。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/attn.py:542-587",
+  "kind": "code",
+  "title": "_compute_kv_ca_index 如何分派 Full / Reindex / Reuse",
+  "path": "deepinfer/model_executor/models/v4_modules/attn.py",
+  "first": 548,
+  "last": 587,
+  "steps": [
+   [
+    "传递 pre-RoPE KV",
+    "548-551",
+    "kv source 把写 main KV 时得到的 pre_rope_kv 存入 runtime，index-K source 再从 runtime 取回。"
+   ],
+   [
+    "本层选 Top-K",
+    "553-567",
+    "Full / Reindex 层调用本层 indexer 选 Top-K，只有 index-K source 传入 pre_rope_kv。"
+   ],
+   [
+    "Reuse 取共享",
+    "568-570",
+    "没有本层 indexer 的稀疏层直接取最近 index source 写下的 topk_indices。"
+   ],
+   [
+    "compact 行数检查",
+    "571-578",
+    "YOCO 全长 KV 已写入时，共享的 topk_indices 行数必须与 compact 后的 query 布局一致。"
+   ],
+   [
+    "非稀疏层",
+    "579-580",
+    "非稀疏层使用 input_metadata 中预先算好的 kv_ca_index。"
+   ],
+   [
+    "延迟写 KV",
+    "582-584",
+    "没有本层 indexer 的 kv source 推迟写 main KV，以便与 CP all-gather 重叠。"
+   ],
+   [
+    "回写 Top-K",
+    "585-587",
+    "有本层 indexer 的层把结果写回 runtime，供后续 Reuse 层读取。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/attn.py:640-669",
+  "kind": "code",
+  "title": "Decode 注意力如何在一个 kernel 里合并 SWA 与稀疏 global",
+  "path": "deepinfer/model_executor/models/v4_modules/attn.py",
+  "first": 636,
+  "last": 669,
+  "steps": [
+   [
+    "稠密索引长度",
+    "636-638",
+    "非稀疏层额外取 kv_ca_index_len 作为索引长度。"
+   ],
+   [
+    "SWA 层参数",
+    "640-647",
+    "有 SWA 的层以 swa_cache 为主 KV，ca_cache 和 Top-K 下标作为 extra KV 一并传入。"
+   ],
+   [
+    "无 SWA 层参数",
+    "648-653",
+    "没有 SWA 的层直接以 ca_cache 为主 KV。"
+   ],
+   [
+    "融合参数",
+    "655-656",
+    "准备计时层信息以及 norm、RoPE、cast 的融合参数。"
+   ],
+   [
+    "调用 FlashMLA",
+    "657-669",
+    "decode_mla_mqa_sparse 一次完成注意力计算，同时传入 attn_sink 和 batch_invariant 开关。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/attn.py:832-842",
+  "kind": "code",
+  "title": "Prefill 如何加载 main KV 并共享给后续层",
+  "path": "deepinfer/model_executor/models/v4_modules/attn.py",
+  "first": 825,
+  "last": 843,
+  "steps": [
+   [
+    "当前 SWA KV",
+    "825-830",
+    "SWA 层把本 chunk 的 SWA KV 写入 kv 缓冲区，CP 下先按 mirror_cp_reverse_index gather。"
+   ],
+   [
+    "加载条件",
+    "832-833",
+    "只有 prefill 且本层不共享 KV 或本身是 kv source 时，才加载 main KV。"
+   ],
+   [
+    "读分页 KV",
+    "834-839",
+    "load_paged_kv_cache 按 load_segments_ca 把 ca_cache 中的压缩 KV 读到 kv 缓冲区的尾部。"
+   ],
+   [
+    "共享给后续层",
+    "840-842",
+    "共享 KV 的 source 层把加载好的 kv 及 main KV 偏移存入 cross_layer_runtime，后续层不再重复加载。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/index_attn.py:2",
+  "kind": "code",
+  "title": "候选源层如何选出候选块",
+  "path": "deepinfer/model_executor/models/v4_modules/index_attn.py",
+  "first": 204,
+  "last": 226,
+  "steps": [
+   [
+    "读取配置",
+    "211-213",
+    "从候选配置读取 topk_block 与 block_size，并断言块数不超过可用块数。"
+   ],
+   [
+    "定位输出",
+    "214",
+    "结果直接写入 cross_layer_runtime.block_candidate_idxs 的对应行。"
+   ],
+   [
+    "块级 max",
+    "215",
+    "candidate_block_max 对 p_sum 做块内 max 归约，k_len 限定每行的有效范围。"
+   ],
+   [
+    "块级 Top-K",
+    "216-226",
+    "topk 在有效块内选出 topk_block 个块号，输出按下标排序的 int32 索引，不足处填 -1。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/cross_layer.py:234-238\n            ",
+  "kind": "code",
+  "title": "候选池容量如何在构造期校验",
+  "path": "deepinfer/model_executor/models/v4_modules/cross_layer.py",
+  "first": 224,
+  "last": 238,
+  "steps": [
+   [
+    "遍历 consumer",
+    "227-230",
+    "遍历候选映射中除源层以外的每个 consumer 层。"
+   ],
+   [
+    "压缩率一致",
+    "231-233",
+    "consumer 的 kv_compress_ratio 必须与候选源层相同。"
+   ],
+   [
+    "换算块大小",
+    "234-236",
+    "把候选块大小换算到 consumer 的压缩粒度，要求不超过 16。"
+   ],
+   [
+    "容量不小于 topk",
+    "237-238",
+    "候选块数乘以块大小得到候选容量，必须不小于 consumer 的 index_topk。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// csrc/engine/input_metadata/prepare_tensor_input_v4.cpp:14",
+  "kind": "code",
+  "title": "YoCo 截断下 SWA 可见域如何计算",
+  "path": "csrc/engine/input_metadata/prepare_tensor_input_v4.cpp",
+  "first": 149,
+  "last": 167,
+  "steps": [
+   [
+    "组合下界",
+    "149-155",
+    "可见域下界取滑窗下界、矩形下界 rect_lo 与 valid_start 三者的最大值，再 clamp 到 [0, pos + 1]。"
+   ],
+   [
+    "缓存段起点",
+    "157-161",
+    "把落在 q_start 之前的部分换算成 SWA 缓存中的 start_slot，并检查它在 [0, window_size] 内。"
+   ],
+   [
+    "本 chunk 段",
+    "163-165",
+    "计算本 chunk 内的可见起点 k_lo 和长度 new_len = j - k_lo + 1。"
+   ],
+   [
+    "返回两段",
+    "167",
+    "返回缓存段的起点与长度，以及本 chunk 段的起点与长度。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// csrc/engine/input_metadata/prepare_tensor_input_v4.cpp:22",
+  "kind": "code",
+  "title": "compact 模式如何计算每个请求保留的行",
+  "path": "csrc/engine/input_metadata/prepare_tensor_input_v4.cpp",
+  "first": 203,
+  "last": 232,
+  "steps": [
+   [
+    "读参数",
+    "203-209",
+    "读取窗口大小、keep_tokens，并判断是否为 compact 模式。"
+   ],
+   [
+    "准备缓冲",
+    "211-216",
+    "为 clip_prefix、full 布局起点和 compact 布局的累积长度 cu_c 分配 CPU 缓冲。"
+   ],
+   [
+    "定位 chunk",
+    "217-221",
+    "对每个请求取 chunk 长度 q_len、起点 q_start 和序列总长 data_len。"
+   ],
+   [
+    "算 clip_prefix",
+    "222-226",
+    "compact 下截掉保留区间之前的行，至少保留 1 行占位；mask 模式恒为 0。"
+   ],
+   [
+    "累积 compact 长度",
+    "227-232",
+    "keep_len = q_len - clip_prefix，累加得到 compact 布局的 cu_c 和 total_q_c。"
+   ]
+  ]
+ },
+ {
+  "anchor": "layer 0..19 (producer, 全长 N 行)\n   │  hid",
+  "kind": "arch",
+  "title": "Compact Prefill 如何保留全长 KV",
+  "reuse": true
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/decode",
+  "kind": "code",
+  "title": "第一个 consumer 层如何切换到 compact 布局",
+  "path": "deepinfer/model_executor/models/decoder_layer.py",
+  "first": 134,
+  "last": 152,
+  "steps": [
+   [
+    "边界判断",
+    "134",
+    "full metadata 已设置而 consumer_full_hidden 还没生成，说明当前是 compact 边界后的第一层。"
+   ],
+   [
+    "前置检查",
+    "135-136",
+    "要求输入是 YOCO metadata，且该层不能是 Engram 层。"
+   ],
+   [
+    "拆分两份",
+    "137-139",
+    "compact_yoco_boundary 把 hidden、residual 等拆成 compact 与全长两份。"
+   ],
+   [
+    "全长 hidden",
+    "140",
+    "对全长输入做 attn_norm，结果存为 consumer_full_hidden，用于写全长 KV。"
+   ],
+   [
+    "只算 compact",
+    "141-143",
+    "本层后续的 hidden 和 residual 换成 compact 版本再做 attn_norm。"
+   ],
+   [
+    "保存 shared hidden",
+    "146-152",
+    "第一个 consumer 层把 compact 版 bf16 hidden 克隆为 shared_hidden，供后续 consumer 层使用。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/mtp/df",
+  "kind": "code",
+  "title": "DFlash 如何逐位置修正 logits 并采样 draft",
+  "path": "deepinfer/model_executor/models/mtp/dflash.py",
+  "first": 308,
+  "last": 334,
+  "steps": [
+   [
+    "按位置取 logits",
+    "308-309",
+    "对 max_MTP_value 个草稿位置逐一取出各请求在该位置的 logits。"
+   ],
+   [
+    "Markov 修正",
+    "310-314",
+    "开启 Markov 时，把上一个 draft token 经 markov_w1 / markov_w2 得到的低秩项累加到 logits 上。"
+   ],
+   [
+    "置信度",
+    "315-321",
+    "ConfidenceHead 用该位置的 hidden 和 w1 输出该 draft 被接受的概率。"
+   ],
+   [
+    "采样",
+    "322-330",
+    "process_sampling 采样出该位置的 draft token，并写入 logprobs。"
+   ],
+   [
+    "收集结果",
+    "331-334",
+    "force_topk 时把下标映射回 token id；采样结果作为下一位置的输入并被收集。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// csrc/engine/mtp_varlen.hpp:235-258（节选",
+  "kind": "code",
+  "title": "DSpark 怎样分配验证预算",
+  "reuse": true
+ },
+ {
+  "anchor": "# deepinfer/model_executor/layers/tilelang_ops/schedule_mtp_",
+  "kind": "code",
+  "title": "GPU 参考实现如何按累积置信度分配验证 token",
+  "path": "deepinfer/model_executor/layers/tilelang_ops/schedule_mtp_varlen.py",
+  "first": 59,
+  "last": 98,
+  "steps": [
+   [
+    "取上一步置信度",
+    "59-65",
+    "按 remap 收集上一步的 confidence rates，新进入 batch 的请求置为 0。"
+   ],
+   [
+    "累积乘积",
+    "67-68",
+    "沿 draft 位置做 cumprod，得到每个位置的累积接受概率。"
+   ],
+   [
+    "额外预算",
+    "70-74",
+    "总预算 total_q 减去每个请求保底的 1 个 token 得到 extra_budget，并把所有位置展平。"
+   ],
+   [
+    "全局排名",
+    "84-92",
+    "稳定降序排序得到每个位置的排名，同分时下标小者优先。"
+   ],
+   [
+    "统计胜出数",
+    "94-98",
+    "每个请求的 seqlen_q 等于 1 加上排名进入前 extra_budget 的位置数。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/parallel_util",
+  "kind": "code",
+  "title": "进程组如何按 DP / CP / EP 划分",
+  "path": "deepinfer/model_executor/parallel_utils/parallel_state.py",
+  "first": 85,
+  "last": 118,
+  "steps": [
+   [
+    "World / Local",
+    "85-89",
+    "先建包含全部 rank 的 world 组和单卡 local 组。"
+   ],
+   [
+    "DP 组",
+    "91-94",
+    "DP 组由各 CP 组中下标相同的卡组成，同时建一个 gloo 组供 CPU 侧投票。"
+   ],
+   [
+    "CP 组",
+    "96-99",
+    "相邻 cp_size 张卡组成一个 CP 组，同样配一个 gloo 组。"
+   ],
+   [
+    "EP 组",
+    "101-106",
+    "EP 组按连续 ep_size 张卡划分，等于全部卡时直接复用 world 组。"
+   ],
+   [
+    "Engram 组",
+    "108-110",
+    "Engram 使用独立的 ENP 组。"
+   ],
+   [
+    "EP-in-DP 组",
+    "112-118",
+    "按连续 ep_size 张卡建 EP-in-DP 组及其 gloo 组，ep_size 为 1 时复用 local 组。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// csrc/engine/input_metadata/prepare_tensor_input_v4.cpp:18",
+  "kind": "code",
+  "title": "mirror CP 下如何统计每个 rank 保留的行数",
+  "path": "csrc/engine/input_metadata/prepare_tensor_input_v4.cpp",
+  "first": 180,
+  "last": 200,
+  "steps": [
+   [
+    "逐请求读取",
+    "180-183",
+    "对每个请求取 q_len 与 clip，得到 compact 后的 keep_len。"
+   ],
+   [
+    "mirror 总长",
+    "184",
+    "compact 后的行数按 2×cp 段向上取整，累加到 cp_mirror_len。"
+   ],
+   [
+    "zigzag 分段",
+    "185-187",
+    "每条序列切成 2×cp 段，rank r 持有第 r 段和第 2cp-1-r 段。"
+   ],
+   [
+    "统计保留行",
+    "188-190",
+    "每段与保留区间 [clip, q_len) 求交，交集长度累加到该 rank。"
+   ],
+   [
+    "取最大值",
+    "194-200",
+    "所有 rank 中最大的保留行数作为 contrib_pad_len，与 cp_mirror_len 一起写入结果。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/models/v4_modules/mlp.py:184-188\n",
+  "kind": "code",
+  "title": "MoE 层如何决定走 Mega MoE",
+  "path": "deepinfer/model_executor/models/v4_modules/mlp.py",
+  "first": 177,
+  "last": 188,
+  "steps": [
+   [
+    "确定 MMA 类型",
+    "177-182",
+    "按激活是否 fp8、权重是 fp4 / bf16 / fp8 组合出 mma_type，并限定为三种。"
+   ],
+   [
+    "平台条件",
+    "185",
+    "GPU 上任一支持类型都可用，非 GPU 平台只允许 fp8xfp4。"
+   ],
+   [
+    "类型条件",
+    "186",
+    "mma_type 必须是 fp8xfp4、fp8xfp8 或 bf16xbf16。"
+   ],
+   [
+    "NVLink 域",
+    "187",
+    "EP 组必须位于同一个 NVLink 域内，否则走 DeepEP 路径。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/eplb/policy.p",
+  "kind": "code",
+  "title": "EPLB 如何贪心放置物理专家",
+  "path": "deepinfer/model_executor/eplb/policy.py",
+  "first": 31,
+  "last": 70,
+  "steps": [
+   [
+    "按负载排序",
+    "31-35",
+    "按每个副本的历史总负载降序排列物理专家，同负载时保留原槽位顺序。"
+   ],
+   [
+    "逐 step 负载",
+    "36-42",
+    "把 token 计数整理成每层每个专家逐 step 的负载向量，并算出 rank 数。"
+   ],
+   [
+    "初始化",
+    "43-52",
+    "为每层每个 rank 的逐 step 负载、各 step 峰值和占用数分配缓冲。"
+   ],
+   [
+    "试放到各 rank",
+    "53-60",
+    "对当前专家，计算放到每个 rank 后各 step 的最大 rank 负载，求和作为得分。"
+   ],
+   [
+    "选最低分",
+    "61-63",
+    "排除已满的 rank，选得分最低的 rank，同分时取最小 rank ID。"
+   ],
+   [
+    "更新状态",
+    "64-70",
+    "写入放置结果，更新占用数、该 rank 的负载与各 step 峰值。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/worker/runtime_config.py:61-",
+  "kind": "code",
+  "title": "运行时如何配置 kernel 库的 PDL 与确定性",
+  "path": "deepinfer/worker/runtime_config.py",
+  "first": 61,
+  "last": 69,
+  "steps": [
+   [
+    "NPU 限制",
+    "61-63",
+    "NPU 上暂不支持 batch invariant，开启即断言失败。"
+   ],
+   [
+    "GPU 开 PDL",
+    "64-66",
+    "GPU 上为 DeepGEMM 和 TileKernels 开启 PDL。"
+   ],
+   [
+    "确定性算法",
+    "67-69",
+    "开启 batch invariant 或在 NPU 上运行时，两个库都切换到确定性算法。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# deepinfer/model_executor/layers/tilelang_ops/ops.py:14-21\n",
+  "kind": "code",
+  "title": "TileLang ops 如何按平台选择后端",
+  "path": "deepinfer/model_executor/layers/tilelang_ops/ops.py",
+  "first": 13,
+  "last": 22,
+  "steps": [
+   [
+    "选后端包",
+    "13-15",
+    "按 PLATFORM.tilelang_ops_backend 导入对应的后端包（cuda 或 asc）。"
+   ],
+   [
+    "遍历子模块",
+    "16-17",
+    "逐个导入后端包内的子模块。"
+   ],
+   [
+    "筛选 _tl 符号",
+    "18-20",
+    "只保留不以下划线开头、不是模块且以 _tl 结尾的对象。"
+   ],
+   [
+    "防冲突导出",
+    "21-22",
+    "同名符号必须是同一个对象，然后导出到 ops 模块的全局命名空间。"
+   ]
+  ]
+ }
+]

@@ -2,6 +2,7 @@
 
 import json
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -16,6 +17,8 @@ SOURCES = {
 }
 FLASH_REPORT = "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/main/DeepSeek_V41_Tech_Report.pdf"
 RSI_PAPER = "https://arxiv.org/abs/2607.28568"
+SPECS = pathlib.Path(__file__).with_name("figure-specs")
+SPEC_SOURCE = {"flash": "infer", "deepinfer": "infer", "harness": "harness", "openrsi": "rsi"}
 
 
 def upstream(key, path="", first=None, last=None):
@@ -27,13 +30,16 @@ def upstream(key, path="", first=None, last=None):
 
 
 def arch(title, source, caption, *stages):
-    return {
+    data = {
         "kind": "arch", "title": title, "caption": caption, "source": source,
         "stages": [
             dict(key=str(i), label=label, color=color, sub=sub, note=note)
             for i, (label, color, sub, note) in enumerate(stages)
         ],
     }
+    if source is None:
+        del data["source"]
+    return data
 
 
 def code(title, key, path, first, last, *steps):
@@ -174,15 +180,36 @@ def seed_rows():
     for slug, figures in graphs().items():
         page = f"yxm-kb-{slug}"
         notes = NOTES[slug] + " 「工程推断」表示作者依据公开材料作出的判断。"
+        reused = {}
+        inline = []
+        # 每条 spec 用 anchor（原文代码块开头的唯一片段）指明图替换正文里的哪个代码块
+        for spec in json.loads((SPECS / f"{slug}.json").read_text()):
+            if spec.get("reuse"):
+                assert spec["title"] not in reused, spec["title"]
+                reused[spec["title"]] = spec["anchor"]
+            elif spec["kind"] == "code":
+                data = code(spec["title"], SPEC_SOURCE[slug], spec["path"], spec["first"], spec["last"], *spec["steps"])
+                inline.append({**data, "anchor": spec["anchor"]})
+            else:
+                source = spec.get("source", FLASH_REPORT if slug == "flash" else upstream(SPEC_SOURCE[slug]))
+                data = arch(spec["title"], source, spec["caption"], *spec["stages"])
+                inline.append({**data, "anchor": spec["anchor"]})
+        assert set(reused) <= {d["title"] for d in figures}, set(reused)
+        figures = [{**d, "anchor": reused[d["title"]]} if d["title"] in reused else d for d in figures]
         for i, (section, data) in enumerate([*(("figure", d) for d in figures), ("notes", {"body": notes})], 1):
             row_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"yxm-inference-kb/{page}/{section}/{i}"))
             rows.append(dict(id=row_id, page=page, section=section, sort=i*10, data=data))
+        for i, data in enumerate(inline, 1):
+            row_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"yxm-inference-kb/{page}/inline/{data['anchor']}"))
+            rows.append(dict(id=row_id, page=page, section="figure", sort=1000+i*10, data=data))
     return rows
 
 
-def request(query, rows=None):
+def request(query, rows=None, method=None):
     args = ["curl", "-fsS", "--max-time", "20", "-H", "apikey: "+os.environ["KB_SUPABASE_KEY"],
             BASE+"?"+urlencode(query)]
+    if method:
+        args[1:1] = ["-X", method]
     if rows is not None:
         args.extend(["-H", "Content-Type: application/json", "-H",
                      "Prefer: resolution=ignore-duplicates,return=representation", "--data-binary", "@-"])
@@ -195,11 +222,16 @@ if __name__ == "__main__":
     if "--publish" in sys.argv[2:]:
         query = {"id": "in.("+",".join(row["id"] for row in rows)+")", "select": "id,page,section,sort,data"}
         existing = {row["id"]: row for row in request(query)}
-        assert all(existing[row["id"]] == row for row in rows if row["id"] in existing), "Existing figure differs. Review before editing."
+        changed = [row for row in rows if row["id"] in existing and existing[row["id"]] != row]
+        # 已发布的图只允许补 anchor；其余字段若被在线改过，停下来人工核对
+        strip = lambda row: {**row, "data": {k: v for k, v in row["data"].items() if k != "anchor"}}
+        for row in changed:
+            assert strip(existing[row["id"]]) == strip(row), f"Existing figure {row['id']} differs beyond its anchor. Review before editing."
+            request({"id": "eq." + row["id"]}, {"data": row["data"]}, method="PATCH")
         missing = [row for row in rows if row["id"] not in existing]
         if missing:
             request({"on_conflict": "id"}, missing)
         assert {row["id"]: row for row in request(query)} == {row["id"]: row for row in rows}
-        print(f"Verified {len(rows)} published rows")
+        print(f"Verified {len(rows)} published rows ({len(missing)} added, {len(changed)} anchored)")
     else:
         print(json.dumps(rows, ensure_ascii=False))

@@ -1,0 +1,529 @@
+[
+ {
+  "anchor": "空条目列表\n  -> profile 中有序的组合包（bundle）各自的 co",
+  "kind": "arch",
+  "title": "多层 patch 按序叠加生成 dsh 插件树",
+  "caption": "依据 docs/architecture.md 的叠加顺序绘制；省略各 profile 模板内容与 dsh-base 共享层细节。",
+  "stages": [
+   [
+    "空条目列表",
+    "blue",
+    [],
+    "叠加从一个空的条目列表开始。"
+   ],
+   [
+    "bundle patches",
+    "ochre",
+    [
+     "profile 中有序的组合包",
+     "各自的 cordis.patch.yml"
+    ],
+    "按 profile 中的顺序依次应用每个组合包的 patch。"
+   ],
+   [
+    "profile patch",
+    "ochre",
+    [
+     "profile 自己的 cordis.patch.yml"
+    ],
+    "profile 自身的 patch 叠加在组合包之后。"
+   ],
+   [
+    "home patch",
+    "ochre",
+    [
+     "Harness home patch"
+    ],
+    "用户 Harness home 下的 patch 再覆盖一层。"
+   ],
+   [
+    "--patch overlay",
+    "ochre",
+    [
+     "命令行覆盖层"
+    ],
+    "命令行传入的 --patch 最后叠加。"
+   ],
+   [
+    "Cordis 插件树",
+    "green",
+    [
+     "dsh --dump-config 可打印"
+    ],
+    "每条 patch 按 id 替换条目的整个 config 或插入新条目，最终得到运行中的插件树。"
+   ]
+  ]
+ },
+ {
+  "anchor": "                         ┌──────────────",
+  "kind": "arch",
+  "title": "dsh 运行时各服务如何协作",
+  "caption": "依据文中架构总图绘制；省略 profile 叠加层与 compaction、subagent、guard、skill、mcp 等横切插件。",
+  "stages": [
+   [
+    "Web / SDK / ACP / CLI",
+    "blue",
+    [],
+    "各入口载体把用户输入交给 agent 注册表。"
+   ],
+   [
+    "ctx.agents",
+    "blue",
+    [
+     "AgentRegistry",
+     "followup / inject / steer"
+    ],
+    "注册表通过 followup、inject、steer 把消息投递给 agent。"
+   ],
+   [
+    "ctx.agentLoop",
+    "purple",
+    [
+     "ReactLoopAgent",
+     "turn/step 状态机",
+     "inbox、取消"
+    ],
+    "默认驱动 ReactLoopAgent 管理 turn/step 状态机与 inbox。"
+   ],
+   [
+    "ctx.systemPrompt",
+    "gray",
+    [
+     "片段组装",
+     "systemUpdates"
+    ],
+    "系统提示由片段组装，变化以 systemUpdates 形式提交。"
+   ],
+   [
+    "ctx.tools",
+    "gray",
+    [
+     "pre → guard → execute → post",
+     "shell / fs / sandbox / approval"
+    ],
+    "工具注册表与流水线执行工具调用，并依赖 shell、fs、sandbox、approval 服务。"
+   ],
+   [
+    "ctx.sessions",
+    "ochre",
+    [
+     "仅追加 SessionEvent 日志",
+     "deriveMessages() → 冻结请求",
+     "JSONL / SQLite"
+    ],
+    "所有模型可见输入都先落日志，再由日志派生冻结请求。"
+   ],
+   [
+    "ctx.llm",
+    "purple",
+    [
+     "prepareCall / stream",
+     "llm-deepseek / llm-pi-ai",
+     "DeepSeek 扩展 dsh_*"
+    ],
+    "适配器 seam 把冻结请求以流式方式发往模型。"
+   ]
+  ]
+ },
+ {
+  "anchor": "turn/start\n  claim next-step input plus ",
+  "kind": "arch",
+  "title": "一个 turn 内 step 的执行顺序",
+  "caption": "依据 docs/architecture.md 的官方轮次流程绘制；省略取消语义、压缩后系统头重建与运行时上下文对账等细节。",
+  "stages": [
+   [
+    "turn/start",
+    "blue",
+    [
+     "claim 下一 step 输入",
+     "外加一条排队消息"
+    ],
+    "turn 在领取首条输入之前打开。"
+   ],
+   [
+    "assemble",
+    "gray",
+    [
+     "快照 Session 模型选择",
+     "prompt 片段 + 准入工具 schema"
+    ],
+    "为本 step 固定模型选择并组装提示片段与工具 schema。"
+   ],
+   [
+    "agent/pre-step",
+    "gray",
+    [
+     "reject",
+     "enter(messages, startsRequestSeries?)"
+    ],
+    "插件可拒绝本 step，或放行消息并标记新请求序列。"
+   ],
+   [
+    "agent/request",
+    "purple",
+    [
+     "prepareCall"
+    ],
+    "通过 prepareCall 准备本次模型调用。"
+   ],
+   [
+    "session log",
+    "ochre",
+    [
+     "system/message 更新",
+     "user/message",
+     "request/header · request/context",
+     "派生并冻结模型历史"
+    ],
+    "先把更新和输入追加到日志，再从日志派生并冻结模型历史。"
+   ],
+   [
+    "llm/stream",
+    "purple",
+    [
+     "agent/assistant-stream",
+     "assistant/message | assistant/attempt"
+    ],
+    "流式调用模型，结果记为 assistant/message 或 assistant/attempt。"
+   ],
+   [
+    "tools",
+    "gray",
+    [
+     "tool/call → pre/execute/post",
+     "tool/result"
+    ],
+    "工具调用经执行流水线后产生 tool/result。"
+   ],
+   [
+    "step/end → turn/end",
+    "green",
+    [
+     "仍欠请求或有新输入 → 下一 step",
+     "agent/turn-stopping"
+    ],
+    "工具仍欠请求或新输入到达时进入下一 step，否则停止并关闭 turn。"
+   ]
+  ]
+ },
+ {
+  "anchor": "private async preStep(target: InboxTarge",
+  "kind": "code",
+  "title": "preStep 领取输入、组装提示并经 pre-step 钩子决定是否进入 step",
+  "path": "packages/core/agent-loop/src/agent.ts",
+  "first": 286,
+  "last": 320,
+  "steps": [
+   [
+    "领取输入",
+    "286-294",
+    "确认处于运行阶段后从 inbox 领取本 step 的消息，并读取当前模型选择，缺失时直接报错。"
+   ],
+   [
+    "解析工具集",
+    "295",
+    "按 agent 与模型选择解析本 step 准入的工具集。"
+   ],
+   [
+    "组装提示",
+    "296-298",
+    "用模型选择和工具集组装系统提示，随后检查是否已取消。"
+   ],
+   [
+    "pre-step 钩子",
+    "299-309",
+    "以 agent/pre-step waterfall 让插件决策，默认实现把运行时上下文投影附加到领取的消息后并返回 enter。"
+   ],
+   [
+    "拒绝分支",
+    "310-314",
+    "若决策为 reject，释放工具集并原样返回该决策。"
+   ],
+   [
+    "返回准备结果",
+    "315-319",
+    "放行时连同组装结果、模型选择和工具集一起返回，异常时同样释放工具集后抛出。"
+   ]
+  ]
+ },
+ {
+  "anchor": "const startsRequestSeries = firstAttempt",
+  "kind": "code",
+  "title": "step 先把系统更新与用户输入追加到会话日志再构建请求",
+  "path": "packages/core/agent-loop/src/agent.ts",
+  "first": 447,
+  "last": 469,
+  "steps": [
+   [
+    "序列标记",
+    "447-448",
+    "仅首次尝试且 pre-step 要求时才开启新请求序列，并初始化运行时上下文准入标记。"
+   ],
+   [
+    "系统更新",
+    "449-452",
+    "把组装产生的 systemUpdates 追加为 system/message，重试时只写压缩所需的重建。"
+   ],
+   [
+    "用户消息",
+    "453-464",
+    "首次尝试时把放行的消息逐条追加为 user/message，运行时上下文占位只追加一次投影结果。"
+   ],
+   [
+    "补齐上下文",
+    "465-467",
+    "若运行时上下文尚未写入，则在末尾补追加一条 user/message。"
+   ],
+   [
+    "构建请求",
+    "468-469",
+    "标记首次尝试已结束，再调用 buildRequest 从日志派生请求。"
+   ]
+  ]
+ },
+ {
+  "anchor": "const finish = live.finish\nif (finish.ki",
+  "kind": "code",
+  "title": "流式调用失败时记录 attempt 并由钩子决定是否重试",
+  "path": "packages/core/agent-loop/src/agent.ts",
+  "first": 531,
+  "last": 553,
+  "steps": [
+   [
+    "判断失败",
+    "531-533",
+    "读取流的结束状态，只处理 error 或 aborted 两种情况。"
+   ],
+   [
+    "记录尝试",
+    "534-537",
+    "把失败的流作为 assistant/attempt 追加到会话日志。"
+   ],
+   [
+    "错误钩子",
+    "538-548",
+    "以 agent/request-error waterfall 携带失败信息和重试策略询问插件，默认不处理。"
+   ],
+   [
+    "重试或抛错",
+    "549-553",
+    "检查取消后，若插件未返回 retry 就抛出 LlmError，否则 continue 进入下一次尝试。"
+   ]
+  ]
+ },
+ {
+  "anchor": "const surfaceGeneration = session.surfac",
+  "kind": "code",
+  "title": "buildRequest 规范化请求头并按需记录 request/header 事件",
+  "path": "packages/core/agent-loop/src/agent.ts",
+  "first": 655,
+  "last": 681,
+  "steps": [
+   [
+    "规范化请求头",
+    "655-660",
+    "记录当前表层内容代数，并由 config、适配器默认值和工具列表生成规范化请求头。"
+   ],
+   [
+    "判定新序列",
+    "661-664",
+    "读取日志中的基线请求头；pre-step 要求或表层代数变化时视为开启新序列。"
+   ],
+   [
+    "首次记录",
+    "665-672",
+    "本 agent 首次构建请求时追加 request/header，原因为 initial 或 resume。"
+   ],
+   [
+    "请求头变化",
+    "673-678",
+    "请求头与基线不同时追加 reason 为 change 的 request/header。"
+   ],
+   [
+    "仅序列边界",
+    "679-681",
+    "请求头未变但开启新序列时，追加 reason 为 series 的记录。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// canonicalHeader is shallow; append lo",
+  "kind": "code",
+  "title": "从会话日志构建不可变请求",
+  "reuse": true
+ },
+ {
+  "anchor": " 用户/SDK ──followup()──▶ inbox ──claim──▶",
+  "kind": "arch",
+  "title": "Session 事件如何生成模型请求",
+  "reuse": true
+ },
+ {
+  "anchor": "assistant 消息含 tool-call\n  -> ToolExecuto",
+  "kind": "arch",
+  "title": "工具调用如何通过权限与执行流程",
+  "reuse": true
+ },
+ {
+  "anchor": "executionMode(exec: ToolExecutionInput):",
+  "kind": "code",
+  "title": "executionMode 以失败即独占的方式决定工具调度模式",
+  "path": "packages/core/tools/src/pipeline.ts",
+  "first": 106,
+  "last": 115,
+  "steps": [
+   [
+    "解析工具",
+    "106-108",
+    "解析本次调用对应的工具，找不到或未声明 isConcurrencySafe 时返回 exclusive。"
+   ],
+   [
+    "询问并发安全",
+    "109-111",
+    "用调用参数执行 isConcurrencySafe，只有精确返回 true 才是 parallel。"
+   ],
+   [
+    "异常兜底",
+    "112-114",
+    "判定函数抛错时同样按 exclusive 处理。"
+   ]
+  ]
+ },
+ {
+  "anchor": "while (next < planned.length) {\n  // Com",
+  "kind": "code",
+  "title": "批次调度循环以独占调用为屏障分组执行工具",
+  "path": "packages/core/tools/src/batch.ts",
+  "first": 74,
+  "last": 92,
+  "steps": [
+   [
+    "循环入口",
+    "74-79",
+    "从第一个未开始的调用起循环，每轮先取出队首调用。"
+   ],
+   [
+    "分组",
+    "80-81",
+    "按队首调用的模式分组：parallel 时取剩余全部调用，exclusive 时只取它自己。"
+   ],
+   [
+    "执行分组",
+    "82-86",
+    "以 maxParallelToolCalls 或默认并行上限运行该组，按实际消耗数推进游标。"
+   ],
+   [
+    "中止处理",
+    "87-90",
+    "若执行被中止，把剩余调用标记为跳过并返回结果。"
+   ],
+   [
+    "返回结果",
+    "91-92",
+    "全部调用处理完后返回批次结算结果。"
+   ]
+  ]
+ },
+ {
+  "anchor": "/**\n * Token accounting for one model ca",
+  "kind": "code",
+  "title": "TokenUsage 以互不重叠的字段记录一次调用的 token 计量",
+  "path": "packages/llm/llm/src/types.ts",
+  "first": 174,
+  "last": 196,
+  "steps": [
+   [
+    "互斥约定",
+    "174-181",
+    "注释规定计数互不重叠：inputTokens 只含未命中缓存的输入，计费输入为三项之和，DeepSeek 的 prompt_tokens 需减去缓存命中。"
+   ],
+   [
+    "必填计数",
+    "182-184",
+    "每次调用必须给出 inputTokens 与 outputTokens。"
+   ],
+   [
+    "总数",
+    "185-192",
+    "totalTokens 为可选的完整总数，来源不可用或不一致时省略。"
+   ],
+   [
+    "缓存与推理",
+    "193-196",
+    "缓存读写和推理 token 作为可选字段单独上报。"
+   ]
+  ]
+ },
+ {
+  "anchor": "export const DEFAULT_MODELS: DeepSeekCat",
+  "kind": "code",
+  "title": "DeepSeek 默认模型目录声明上下文窗口与历史内更新能力",
+  "path": "packages/llm/llm-deepseek/src/models.ts",
+  "first": 4,
+  "last": 23,
+  "steps": [
+   [
+    "上下文窗口",
+    "4-5",
+    "两个官方模型共用官方 /models 声明的 1_048_576 上下文窗口。"
+   ],
+   [
+    "Flash 条目",
+    "9-16",
+    "deepseek-flash 支持文本与图片输入，声明 systemPromptUpdate 为 in-history、toolUpdate 为 addition-only。"
+   ],
+   [
+    "Pro 条目",
+    "17-22",
+    "deepseek-v4-pro 只声明描述和上下文窗口，未声明更新能力。"
+   ]
+  ]
+ },
+ {
+  "anchor": "// Harness admits system updates before ",
+  "kind": "code",
+  "title": "DeepSeek 序列化把系统与工具更新放进历史内的 system 消息",
+  "path": "packages/llm/llm-deepseek/src/serialize.ts",
+  "first": 84,
+  "last": 116,
+  "steps": [
+   [
+    "冲刷更新",
+    "84-90",
+    "flushSystemUpdates 把暂存的系统更新放在 user 或 tool-result 之后，前面不是 user 时报不支持。"
+   ],
+   [
+    "developer 消息",
+    "91-100",
+    "把 developer 消息的 text、tool-addition、tool-removal 块映射为线上格式的 text、tool_addition、tool_removal。"
+   ],
+   [
+    "暂存更新",
+    "101-102",
+    "非空内容作为一条 system 更新暂存，跳过该消息。"
+   ],
+   [
+    "块位置校验",
+    "104-106",
+    "工具增删块出现在 developer 消息之外时报不支持。"
+   ],
+   [
+    "system 消息",
+    "107-116",
+    "历史中已有消息且启用 in-history 时，system 文本作为历史内更新暂存，否则合并进开头的 system 文本。"
+   ]
+  ]
+ },
+ {
+  "anchor": "describe.skipIf(!process.env.DEEPSEEK_AP",
+  "kind": "code",
+  "title": "如何验证请求前缀复用",
+  "reuse": true
+ },
+ {
+  "anchor": "step 1:  [system | tools | u1]          ",
+  "kind": "arch",
+  "title": "上下文压缩与前缀复用",
+  "reuse": true
+ }
+]

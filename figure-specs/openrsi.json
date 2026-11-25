@@ -1,0 +1,401 @@
+[
+ {
+  "anchor": "                         ┌──────────────",
+  "kind": "arch",
+  "title": "搜索、经验与训练如何衔接",
+  "reuse": true
+ },
+ {
+  "anchor": "# OpenMLE-ERL/RL/generate_mle.py:1055-10",
+  "kind": "code",
+  "title": "同一 group 的样本复用缓存的父代选择",
+  "path": "OpenMLE-ERL/RL/generate_mle.py",
+  "first": 1055,
+  "last": 1087,
+  "steps": [
+   [
+    "确定缓存键",
+    "1055-1059",
+    "训练时以 group_index 作为缓存键，评估时缓存键为 None，并初始化次级父代与选择元数据。"
+   ],
+   [
+    "读取组大小",
+    "1061-1064",
+    "从 args 取每个 prompt 的采样数 n_samples_per_prompt，缺省时回退到常量 N_SAMPLES_PER_PROMPT。"
+   ],
+   [
+    "命中缓存加锁",
+    "1067-1071",
+    "缓存键已存在时，在 parent_selection_cache 锁内取出该 group 的缓存条目。"
+   ],
+   [
+    "复用选择结果",
+    "1072-1078",
+    "从缓存解包 prompt、父代、算子模式，四元组时还带次级父代，并复制选择元数据。"
+   ],
+   [
+    "访问计数",
+    "1079-1081",
+    "每命中一次把 access_count 加 1，并读出该组应有的样本总数。"
+   ],
+   [
+    "全部取完即清理",
+    "1086-1087",
+    "当访问次数达到样本总数，即组内所有样本都已复用后，删除该缓存条目。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-ERL/RL/generate_mle.py:1262-12",
+  "kind": "code",
+  "title": "调用 SGLang /generate 并请求返回 logprob",
+  "path": "OpenMLE-ERL/RL/generate_mle.py",
+  "first": 1262,
+  "last": 1294,
+  "steps": [
+   [
+    "构造请求",
+    "1262-1266",
+    "请求体包含输入文本和采样参数，并设置 return_logprob=True，供训练侧做 TIS 修正。"
+   ],
+   [
+    "清理旧元数据",
+    "1267-1270",
+    "移除上一次生成中断遗留的临时元数据和中断类 code_category。"
+   ],
+   [
+    "发送生成请求",
+    "1273-1276",
+    "循环 POST 到生成接口，finish_reason 不是 abort 时跳出。"
+   ],
+   [
+    "训练不重试",
+    "1277-1278",
+    "训练 rollout 遇到 abort 直接跳出，不做重试。"
+   ],
+   [
+    "评估重试上限",
+    "1279-1285",
+    "评估时累加 abort 重试次数，超过 EVAL_GENERATION_ABORT_MAX_RETRIES 就抛出 RuntimeError。"
+   ],
+   [
+    "告警后等待",
+    "1286-1294",
+    "记录重试告警，按配置的间隔休眠后重新生成。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-ERL/RL/reward_func_utils.py:133-152\n    base_rules",
+  "kind": "code",
+  "title": "构建 hack check 审查 prompt",
+  "path": "OpenMLE-ERL/RL/reward_func_utils.py",
+  "first": 131,
+  "last": 169,
+  "steps": [
+   [
+    "6 类作弊规则",
+    "133-144",
+    "基础规则让审查模型判断代码是真正在做机器学习，还是在猜值、返回常量、硬编码规则、输出空预测、不用数据或不训练模型。"
+   ],
+   [
+    "自验证追加 2 类",
+    "145-152",
+    "开启 hold-out 验证要求时追加伪造验证指标和用训练集、泄漏标签或交叉验证冒充 hold-out 两类，并规定不合格标为 hack_verify。"
+   ],
+   [
+    "三分类输出",
+    "153-159",
+    "要求以 JSON 返回 is_valid、category（valid/hack/hack_verify）和 reason。"
+   ],
+   [
+    "普通模式输出",
+    "160-169",
+    "未开启自验证时只用 6 条基础规则，category 只有 valid 和 hack 两类。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-Evo/third_party/aira-evo/src/dojo/solvers/evo/experience.py:392-397, 4",
+  "kind": "code",
+  "title": "为评估过的节点生成确定性经验卡",
+  "path": "OpenMLE-Evo/third_party/aira-evo/src/dojo/solvers/evo/experience.py",
+  "first": 393,
+  "last": 432,
+  "steps": [
+   [
+    "方法族与新颖度",
+    "393-397",
+    "从代码提取 import 并识别方法族，按该族此前出现次数计算新颖度 1/sqrt(1+count)。"
+   ],
+   [
+    "父代参照分",
+    "399-405",
+    "取节点 fitness，并按指标方向在所有有限父代分数中取最好的作为参照。"
+   ],
+   [
+    "相对父代进步",
+    "406",
+    "计算相对最优父代的正向进步 delta_vs_parent。"
+   ],
+   [
+    "谱系与结果字段",
+    "408-426",
+    "卡片记录节点与父代 ID、算子、代数、分数、reward、运行状态和沙箱/模型耗时。"
+   ],
+   [
+    "成本与方法字段",
+    "427-432",
+    "继续写入成本、token 用量、import 列表和自动识别的方法族，全程不调用 LLM。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-Evo/third_party/aira-evo/src/dojo/solvers/evo/experience.py:1217-1226,",
+  "kind": "code",
+  "title": "搜索如何衡量父代价值",
+  "reuse": true
+ },
+ {
+  "anchor": "# OpenMLE-Evo/third_party/aira-evo/src/dojo/solvers/evo/evo.",
+  "kind": "code",
+  "title": "选定父代后按算子收集并总结相关节点",
+  "path": "OpenMLE-Evo/third_party/aira-evo/src/dojo/solvers/evo/evo.py",
+  "first": 982,
+  "last": 1021,
+  "steps": [
+   [
+    "收集参数",
+    "982-984",
+    "向 collect_operator_memory_nodes 传入 journal、指标方向和当前节点。"
+   ],
+   [
+    "按算子设 k",
+    "985-996",
+    "祖先数和兄弟数按算子配置，Improve 默认各取 3，其他算子默认各取 2。"
+   ],
+   [
+    "相关卡上限",
+    "997-998",
+    "传入兄弟排序权重和按算子配置的相关卡片上限。"
+   ],
+   [
+    "合并各分区",
+    "1000-1011",
+    "按 primary、纵向、横向、两个父代各自的纵横向和 debug 相关的顺序合并节点。"
+   ],
+   [
+    "按 ID 去重",
+    "1012-1019",
+    "按节点 ID 去重，跳过空 ID 和重复节点。"
+   ],
+   [
+    "按需富总结",
+    "1020-1021",
+    "只对去重后的这些节点调用 _ensure_node_rich_summary 生成富文本总结。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-ERL/RL/adaptive_reward_advantage_utils.py:86-101\n ",
+  "kind": "code",
+  "title": "按任务历史前沿计算动态 reward 边界",
+  "path": "OpenMLE-ERL/RL/adaptive_reward_advantage_utils.py",
+  "first": 82,
+  "last": 103,
+  "steps": [
+   [
+    "无历史回退",
+    "82-84",
+    "没有历史分数时退回静态边界。"
+   ],
+   [
+    "上界取最优",
+    "86-87",
+    "把带方向的分数降序排列，第一名作为上界 best。"
+   ],
+   [
+    "下界按模式",
+    "89-97",
+    "下界按模式取第 8 名、第 16 名、均值或中位数，发布配置为 top1_top16。"
+   ],
+   [
+    "下界下移",
+    "99-101",
+    "下界再向下平移 shift_ratio 倍的上下界跨度。"
+   ],
+   [
+    "规整返回",
+    "103",
+    "经 _sanitize_bound_pair 规整后返回上下界。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-ERL/RL/reward_func_utils.py:1329-1338\n    if mode ",
+  "kind": "code",
+  "title": "power_clip 把分数映射到 [0,1] reward",
+  "path": "OpenMLE-ERL/RL/reward_func_utils.py",
+  "first": 1323,
+  "last": 1338,
+  "steps": [
+   [
+    "统一方向",
+    "1323",
+    "把原始分数转成越大越好的带方向分数。"
+   ],
+   [
+    "无边界回退",
+    "1329-1332",
+    "取上下界，没有边界时退回 sigmoid。"
+   ],
+   [
+    "线性归一截断",
+    "1334-1336",
+    "按上下界跨度线性映射，并截断到 [0,1]。"
+   ],
+   [
+    "幂次变换",
+    "1337-1338",
+    "取 alpha 次幂作为 reward，发布配置 alpha=1 即线性。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-ERL/RL/generate_mle.py:639-664",
+  "kind": "code",
+  "title": "按算子对 reward 做父代参照整形",
+  "path": "OpenMLE-ERL/RL/generate_mle.py",
+  "first": 639,
+  "last": 664,
+  "steps": [
+   [
+    "零分与抄袭",
+    "639-643",
+    "有父代参照的算子在基础 reward 为 0 或代码与父代相同时，返回全 0。"
+   ],
+   [
+    "参照分",
+    "645-647",
+    "参照分取父代 reward，Crossover 取两个父代中较高者。"
+   ],
+   [
+    "基础整形策略",
+    "649-655",
+    "gate_parent 不超父代则清零，diff_parent 取超出部分，默认 base 保持原值。"
+   ],
+   [
+    "进步奖励",
+    "657-660",
+    "最终 reward 等于整形后基础值加上系数乘以相对参照的正向进步。"
+   ],
+   [
+    "Draft 不整形",
+    "662-664",
+    "Draft 或无父代参照时直接返回基础 reward，进步项为 0。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# OpenMLE-ERL/RL/adaptive_reward_advantage_utils.py:220-245\n",
+  "kind": "code",
+  "title": "组内熵式 advantage 的计算",
+  "path": "OpenMLE-ERL/RL/adaptive_reward_advantage_utils.py",
+  "first": 220,
+  "last": 245,
+  "steps": [
+   [
+    "参数",
+    "220-227",
+    "目标 KL 默认 log 2，并设 beta 上限、二分迭代次数和数值 eps。"
+   ],
+   [
+    "退化组",
+    "228-234",
+    "空组返回空，组内少于 2 个或 reward 全相同时 advantage 全为 0。"
+   ],
+   [
+    "求解 beta",
+    "236",
+    "用二分法求 beta，使 softmax 分布与均匀分布的 KL 等于目标值。"
+   ],
+   [
+    "指数权重",
+    "237-238",
+    "先减去组内最大值保证数值稳定，再计算 exp(beta·r)。"
+   ],
+   [
+    "留一归一",
+    "239-245",
+    "用其余 K−1 个样本的指数均值做分母，权重减 1 得到 advantage。"
+   ]
+  ]
+ },
+ {
+  "anchor": "Harbor 任务目录: task.toml + instruction.md ",
+  "kind": "arch",
+  "title": "RSI-Harness 一次任务的 Work/Judge 流程",
+  "caption": "依据文中 RSI-Harness 流程图绘制，省略了资源、网络策略和超时等 run plan 细节。",
+  "stages": [
+   [
+    "Harbor task",
+    "blue",
+    [
+     "task.toml",
+     "instruction.md",
+     "environment/",
+     "tests/test.sh"
+    ],
+    "任务以 Harbor 目录形式输入。"
+   ],
+   [
+    "Run plan",
+    "gray",
+    [
+     "校验",
+     "构建镜像",
+     "资源/网络/超时"
+    ],
+    "校验任务、构建镜像并生成运行计划。"
+   ],
+   [
+    "Work container",
+    "purple",
+    [
+     "agent 编辑 /workspace",
+     "看不到私有 tests/",
+     "rsi-submit"
+    ],
+    "持久的 Work 容器中 agent 迭代代码，提交时暂停并快照文件系统。"
+   ],
+   [
+    "Judge container",
+    "gray",
+    [
+     "每次提交新建",
+     "只读挂载快照",
+     "注入 /tests 运行 test.sh",
+     "只读 /logs/agent"
+    ],
+    "Judge 从干净镜像新建，运行私有测试并记录 reward 与输出。"
+   ],
+   [
+    "Feedback loop",
+    "ochre",
+    [
+     "反馈返回 Work",
+     "提交次数上限或超时"
+    ],
+    "反馈返回 Work 继续迭代，直到达到提交上限或超时。"
+   ],
+   [
+    "Best snapshot",
+    "green",
+    [
+     "按主 reward 选最好"
+    ],
+    "在有效提交中按主 reward 选出最好的快照。"
+   ]
+  ]
+ }
+]

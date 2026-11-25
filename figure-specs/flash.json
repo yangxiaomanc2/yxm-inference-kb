@@ -1,0 +1,330 @@
+[
+ {
+  "anchor": "layer 0-1   : 纯 SWA\nlayer 2-19  : CSA2 m",
+  "kind": "arch",
+  "title": "V4.1-Flash 的 40 层主干与 3 层 drafter",
+  "caption": "依据文中 HF config 推出的层映射（0 起编号），省略 MoE、mHC、Engram 以及每层都有的 SWA 128。",
+  "stages": [
+   [
+    "Layer 0–1",
+    "purple",
+    [
+     "纯 SWA"
+    ],
+    "前两层只做滑窗注意力，不产生 global KV。"
+   ],
+   [
+    "Layer 2–19 Encoder",
+    "purple",
+    [
+     "CSA2 m=2",
+     "Full@2/8/14",
+     "其余 Reuse"
+    ],
+    "encoder 段只有 3 个 Full 层写 main KV，其余层复用前面最近的 Full。"
+   ],
+   [
+    "Layer 20",
+    "ochre",
+    [
+     "CSA2 m=1，Full",
+     "main KV 由 H_E 投影",
+     "候选池 source"
+    ],
+    "decoder 第一层从 H_E 投影出新的 main KV，同时生成候选池。"
+   ],
+   [
+    "Layer 21–39 Decoder",
+    "purple",
+    [
+     "CSA2 m=1",
+     "Reindex@24/28/32/36",
+     "其余 Reuse"
+    ],
+    "decoder 段不再生产 main KV，Reindex 层只在候选池内重新打分。"
+   ],
+   [
+    "Layer 40–42 DSpark",
+    "green",
+    [
+     "SWA，窗口 128",
+     "drafter"
+    ],
+    "三层 drafter 生成投机解码用的草稿。"
+   ]
+  ]
+ },
+ {
+  "anchor": "main KV  = Σ_{KV source 层} 288 B / m\n   ",
+  "kind": "arch",
+  "title": "890 B/token 的 global KV 预算",
+  "reuse": true
+ },
+ {
+  "anchor": "def _source_map(source_ids: list[int], n",
+  "kind": "code",
+  "title": "HF config 如何展开成跨层共享映射表",
+  "path": "deepinfer/hugging_face/config.py",
+  "first": 62,
+  "last": 85,
+  "steps": [
+   [
+    "就近 source 映射",
+    "62-65",
+    "从第一个 source 层起，把每层映射到不晚于它的最近 source 层。"
+   ],
+   [
+    "读取层数与候选源",
+    "68-70",
+    "取主干层数和 candidate_source_layer_id。"
+   ],
+   [
+    "三张共享映射表",
+    "71-75",
+    "分别为 index-topk、KV、index-K 建映射，index-K 未配置时沿用 kv_source_layer_ids。"
+   ],
+   [
+    "候选池映射",
+    "76-77",
+    "有候选源时，候选源及其后所有层都指向这一层的候选池。"
+   ],
+   [
+    "候选池参数",
+    "78-84",
+    "为候选源记录 top-k 块数、块大小，块分数固定按 max 归约。"
+   ]
+  ]
+ },
+ {
+  "anchor": "def _n_prefill_layer(text):\n    \"\"\"The f",
+  "kind": "code",
+  "title": "按 compress_ratios 构建注意力层并确定 YoCo 边界",
+  "path": "deepinfer/hugging_face/config.py",
+  "first": 146,
+  "last": 161,
+  "steps": [
+   [
+    "校验长度",
+    "148-151",
+    "compress_ratios 的长度必须等于主干层数加 nextn 草稿层数。"
+   ],
+   [
+    "按 ratio 选层",
+    "152",
+    "ratio 为 0 的层建成 SWA 层，其余建成带压缩比的稀疏注意力层。"
+   ],
+   [
+    "LM head 占位",
+    "153",
+    "在列表中为 lm head 留一个 None 位置，不构建 attention。"
+   ],
+   [
+    "追加草稿层",
+    "154",
+    "在末尾追加 nextn 个 DFlash 草稿层。"
+   ],
+   [
+    "确定边界层",
+    "158-161",
+    "第一个 ratio==1 的层及其之前属于 prefill 侧，之后是 YoCo consumer 层，V4.1-Flash 中为 20。"
+   ]
+  ]
+ },
+ {
+  "anchor": "# share-kv must not cross the YOCO compa",
+  "kind": "code",
+  "title": "跨层共享拓扑的合法性校验",
+  "path": "deepinfer/model_executor/models/v4_modules/cross_layer.py",
+  "first": 89,
+  "last": 118,
+  "steps": [
+   [
+    "收集层配置",
+    "91-92",
+    "按层号取出每层的 attention 配置。"
+   ],
+   [
+    "分段细化校验",
+    "93-102",
+    "依次检查 index-topk、index-K、KV 三张表的分段，粗粒度段的起点必须也是细粒度段的起点。"
+   ],
+   [
+    "consumer 须带共享配置",
+    "103-112",
+    "非 source 层若缺少 layer_info_shared_cfg 会被 cache engine 当成 source，因此直接断言失败。"
+   ],
+   [
+    "校验共享层配置",
+    "113",
+    "检查 consumer 层与其 source 层的配置是否兼容。"
+   ],
+   [
+    "KV 不跨 YoCo 边界",
+    "114-116",
+    "n_prefill_layer 层必须是自己的 KV source，即 decoder 第一层要重新生产 KV。"
+   ],
+   [
+    "索引与候选校验",
+    "117-118",
+    "再校验 indexer 与 KV 的兼容性以及候选池配置。"
+   ]
+  ]
+ },
+ {
+  "anchor": "if self.has_local_index and not yoco_ful",
+  "kind": "code",
+  "title": "Full、Reindex、Reuse 在 attention forward 中如何分派",
+  "path": "deepinfer/model_executor/models/v4_modules/attn.py",
+  "first": 544,
+  "last": 583,
+  "steps": [
+   [
+    "Full 写 main KV",
+    "544-548",
+    "有本地 indexer 的 KV source 写入 main KV，并把 RoPE 前的 KV 放进 cross_layer_runtime。"
+   ],
+   [
+    "读上游 pre_rope_kv",
+    "549-551",
+    "只是 index-K source 的层从 runtime 取上游 KV source 写入的 pre_rope_kv。"
+   ],
+   [
+    "本层计算 Top-K",
+    "553-567",
+    "Full 和 Reindex 调用 index_attn 计算 Top-K，只有 index-K source 传入 pre_rope_kv。"
+   ],
+   [
+    "Reuse 取上游 Top-K",
+    "568-578",
+    "没有本地 indexer 的稀疏层直接读 runtime 中的 topk_indices，compact 模式下还校验行数。"
+   ],
+   [
+    "其余层取预置索引",
+    "579-580",
+    "非稀疏层从 input_metadata 按 ratio_key 取预置的索引。"
+   ],
+   [
+    "延迟写 main KV",
+    "582-583",
+    "没有本地 indexer 的 KV source 推迟写 main KV，以便与 CP all-gather 重叠。"
+   ]
+  ]
+ },
+ {
+  "anchor": "for i in range(self.num_layers):\n    if ",
+  "kind": "code",
+  "title": "模型主循环在 YoCo 边界切换 metadata",
+  "path": "deepinfer/model_executor/models/deepseek.py",
+  "first": 190,
+  "last": 215,
+  "steps": [
+   [
+    "逐层前向",
+    "190",
+    "按层号依次执行主干层。"
+   ],
+   [
+    "到达边界层",
+    "191",
+    "只在 prompt 阶段、且到达 yoco_boundary_layer_idx（即 n_prefill_layer=20）时切换。"
+   ],
+   [
+    "compact 切换",
+    "192-198",
+    "compact 模式把 input_metadata 换成 consumer 视图，完整 metadata 经 cross_layer_runtime 交给 full-source 路径。"
+   ],
+   [
+    "DFlash 输入同步",
+    "199-205",
+    "DFlash target 全在 consumer 半区时，把 dflash_input 也按 compact 行数重新分配。"
+   ],
+   [
+    "mask 视图",
+    "206-207",
+    "非 compact 模式只换成 mask 视图，保留全部 query。"
+   ],
+   [
+    "执行当前层",
+    "209-215",
+    "用切换后的 metadata 调用该层的 forward。"
+   ]
+  ]
+ },
+ {
+  "anchor": "[stored region: SWA]                    ",
+  "kind": "arch",
+  "title": "StateBlock 的 stored 与 dropped 分区",
+  "caption": "依据 worker/cache_engine.py 的 StateBlock 注释，按地址从低到高排列，省略 32B 对齐和 extra-state ring 重排。",
+  "stages": [
+   [
+    "Stored: Encoder SWA",
+    "ochre",
+    [
+     "layer < n_prefill_layer"
+    ],
+    "encoder SWA 放在低地址，可落盘或跨节点传输。"
+   ],
+   [
+    "Dropped: Consumer SWA",
+    "gray",
+    [
+     "layer >= n_prefill_layer",
+     "靠 prefill 重算恢复"
+    ],
+    "decoder SWA 运行时保留，但不进入持久化路径。"
+   ],
+   [
+    "Dropped: Compression state",
+    "gray",
+    [
+     "压缩 ring"
+    ],
+    "压缩状态没有跨落盘边界的依赖，同样不落盘。"
+   ],
+   [
+    "state_size_to_disk",
+    "green",
+    [
+     "只含 stored SWA 窗口"
+    ],
+    "落盘时按这个长度截断，即可排除整个 dropped region。"
+   ]
+  ]
+ },
+ {
+  "anchor": "def _topk_candidate_block(self, p_sum, k",
+  "kind": "code",
+  "title": "候选池如何用 block-max 和 top-k 选块",
+  "path": "deepinfer/model_executor/models/v4_modules/index_attn.py",
+  "first": 204,
+  "last": 226,
+  "steps": [
+   [
+    "读取候选配置",
+    "211-213",
+    "取 top-k 块数和块大小，V4.1-Flash 为 2048 和 8，并断言块数不超过可用块数。"
+   ],
+   [
+    "定位输出槽",
+    "214",
+    "在 runtime 的 block_candidate_idxs 中切出本批行对应的输出区。"
+   ],
+   [
+    "按块取最大值",
+    "215",
+    "candidate_block_max 把 token 级分数 p_sum 按块取 max，并给出每行有效块数。"
+   ],
+   [
+    "块级 top-k",
+    "216-226",
+    "在有效块内选出 top-k 块，输出排好序的 int32 块下标，越界位置填 -1。"
+   ]
+  ]
+ },
+ {
+  "anchor": "update_best(); // All the golden tokens\n",
+  "kind": "code",
+  "title": "DSpark 怎样分配验证预算",
+  "reuse": true
+ }
+]

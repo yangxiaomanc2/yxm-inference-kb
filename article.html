@@ -38,9 +38,7 @@ align-items:start;margin-top:36px}
 .layout>div{min-width:0}
 .toc{position:sticky;top:84px;max-height:calc(100vh - 120px);overflow:auto;
 font-size:13px;border-left:1px solid var(--line);padding-left:16px}
-.toc summary,.article-details summary{cursor:pointer}
-.article-details{margin-top:32px;border-top:1px solid var(--line);padding-top:16px;scroll-margin-top:76px}
-.article-details>div{margin-top:18px}
+.toc summary{cursor:pointer}
 .kb-figure{scroll-margin-top:76px}
 .toc a{display:block;color:var(--muted);padding:4px 0;line-height:1.45}
 .toc a:hover{color:var(--ink);text-decoration:none}
@@ -192,8 +190,8 @@ function listBlock(items,tag){
   return out+'</'+tag+'>';
 }
 
-/* 返回 {title, html, toc:[[level,id,text]]} */
-function renderMd(md){
+/* 返回 {title, html, toc:[[level,id,text]]}；以 anchors[k] 开头的代码块输出为图位 data-fig=k */
+function renderMd(md,anchors=[]){
   const lines=String(md||'').replace(/\r\n/g,'\n').split('\n');
   const out=[],toc=[],used=new Set();
   let title='',i=0;
@@ -206,6 +204,8 @@ function renderMd(md){
       const buf=[];i++;
       while(i<n&&!lines[i].startsWith('```')){buf.push(lines[i]);i++;}
       i++;
+      const slot=anchors.findIndex(a=>buf.join('\n').startsWith(a));
+      if(slot>=0){out.push('<div class="fig-slot" data-fig="'+slot+'"></div>');continue;}
       out.push('<pre'+(/^[\w+-]+$/.test(lang)?' class="lang-'+lang+'"':'')+'><code>'+esc(buf.join('\n'))+'</code></pre>');
       continue;
     }
@@ -270,47 +270,44 @@ function readingCopy(md){
 }
 
 function banner(msg){const b=$('#banner');b.hidden=false;b.textContent=msg;}
-let row=null,io=null;
+let row=null,io=null,painted=false;
 
 function paint(d,figures=[],notes=''){
-  const r=renderMd(readingCopy(d.md));
+  const anchors=figures.map(f=>typeof f.anchor==='string'&&f.anchor?f.anchor:'\u0000');
+  const r=renderMd(readingCopy(d.md),anchors);
   const title=d.title||r.title||'未命名知识页';
   document.title=title+' · YXM 知识库';
   $('#title').textContent=title;
   $('#lead').textContent=d.lead||'';
   const body=$('#body');
-  const previousOpen=body.querySelector('.article-details')?.open;
   body.querySelectorAll('.kb-figure').forEach(fig=>fig.disposeFigure?.());
-  body.replaceChildren();
+  body.innerHTML=r.html;
+  // 正文里找不到对应代码块的图（含概览图）放在正文前，图号按页面中出现的顺序编排
+  const placed=new Set([...body.querySelectorAll('.fig-slot')].map(s=>+s.dataset.fig));
+  const lead=document.createDocumentFragment();
   const links=[];
-  if(figures.length){
-    figures.forEach((data,i)=>{
-      const fig=Fig.render(data,i+1);
-      fig.id='kb-figure-'+(i+1);
-      body.append(fig);
-      links.push([2,fig.id,data.title]);
-    });
-    const details=document.createElement('details');
-    details.className='article-details';
-    details.id='reading-details';
-    details.open=Boolean(previousOpen);
-    const summary=document.createElement('summary');
-    summary.textContent='展开完整分析与数据对照';
-    const reading=document.createElement('div');
-    reading.innerHTML=r.html;
-    details.append(summary,reading);
-    body.append(details);
-    links.push([2,details.id,'完整分析与数据对照']);
+  figures.forEach((data,i)=>{
+    if(placed.has(i)) return;
+    const slot=document.createElement('div');
+    slot.className='fig-slot';slot.dataset.fig=i;
+    lead.append(slot);
+  });
+  const overview=lead.childElementCount;
+  body.prepend(lead);
+  let figNo=0;
+  body.querySelectorAll('.fig-slot').forEach((slot,n)=>{
+    const data=figures[+slot.dataset.fig];
+    const fig=Fig.render(data,++figNo);
+    fig.id='kb-figure-'+figNo;
+    slot.replaceWith(fig);
+    if(n<overview) links.push([2,fig.id,data.title]);
+  });
+  links.push(...r.toc);
+  if(!painted){
     let hash=location.hash.slice(1);
     try{hash=decodeURIComponent(hash);}catch{}
-    const target=document.getElementById(hash);
-    if(target && reading.contains(target)){
-      details.open=true;
-      target.scrollIntoView();
-    }
-  }else{
-    body.innerHTML=r.html;
-    links.push(...r.toc);
+    document.getElementById(hash)?.scrollIntoView();
+    painted=true;
   }
   const toc=$('#toc');toc.textContent='';
   $('#toc-panel').hidden=!links.length;
