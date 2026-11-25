@@ -15,6 +15,7 @@
 | [DeepSeek Harness 框架与创新点](./article.html?p=harness) | “一切皆插件”的 Agent 运行时：Cordis 架构、agent loop、工具流水线与权限边界 |
 | [OpenRSI 框架与创新点](./article.html?p=openrsi) | AI4AI / 递归自我改进：搜索—经验—训练闭环、Frontis-MA1 的奖励设计 |
 | [推理优化知识概览](./推理优化知识概览/) | 学习地图：从并行策略到 kernel 开发，带前置依赖、动手练习与官方资料入口 |
+| [当前大模型Thinking模式与实现](./当前大模型Thinking模式与实现/) | Thinking/Reasoning 模式、厂商接口、推理训练、vLLM/SGLang 服务端实现与评测方法 |
 
 ## 关于内容形态
 
