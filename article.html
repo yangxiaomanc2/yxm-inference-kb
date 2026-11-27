@@ -87,81 +87,82 @@ footer a{color:inherit;text-decoration:underline}
 .wrap{padding:0 18px}article{font-size:15px}
 .bar .wrap{padding:8px 18px}}
 
-/* Editorial research layout: preserve the YXM shell and the original left TOC */
+/* Flash article: match the YXM knowledge-base home visual language */
 body.flash-page{
-  --bg:#fff;--surface:#fff;--ink:#171717;--muted:#666;--line:#e7e7e7;
-  --accent:#cf6545;--accent-2:#171717;--soft:#f6f5f2;
-  --serif:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  --sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  background:#fff;color:#171717;line-height:1.75;
+  --bg:#faf9f5;--surface:#fff;--ink:#141413;--muted:#6b6a65;--line:#e8e6dc;
+  --accent:#d97757;--accent-2:#f38020;--soft:#f0eee6;
+  --serif:"Tiempos Headline",Georgia,"Songti SC","Noto Serif SC",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.7;
 }
-.flash-page .bar{background:#fff;border-bottom:1px solid #e8e8e8;backdrop-filter:none}
-.flash-page .bar .site{font-family:var(--sans);font-weight:700;letter-spacing:-.02em}
-.flash-page .btn{border-color:#d8d8d8;border-radius:6px}
-.flash-page .btn.on,.flash-page .editor .pri{background:#171717;border-color:#171717}
-.flash-page .hero{max-width:1120px;padding:54px 24px 28px}
-.flash-page .eyebrow{display:block;color:#777;font:12px/1.4 var(--mono);letter-spacing:.12em;
-  text-transform:uppercase;margin-bottom:18px}
-.flash-page h1.t{font-family:var(--sans);font-size:clamp(40px,5.1vw,62px);font-weight:690;
-  letter-spacing:-.052em;line-height:1.06;margin:0;max-width:1000px;color:#171717}
-.flash-page h1.t .title-accent{color:var(--accent)}
-.flash-page h1.t .title-rest{color:#171717}
-.flash-page .lead{font-family:var(--sans);font-size:clamp(18px,1.8vw,20px);line-height:1.62;
-  font-weight:400;color:#4e4e4e;max-width:940px;margin-top:24px}
-.flash-page .article-meta{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:25px;
-  color:#777;font-size:13px;line-height:1.6}
-.flash-page .article-meta span+span:before{content:"·";margin-right:22px;color:#aaa}
+.flash-page .bar{background:var(--bg);border-bottom:1px solid var(--line);backdrop-filter:none}
+.flash-page .bar .site{font-family:var(--serif);font-size:16px;font-weight:400;letter-spacing:0;color:var(--ink)}
+.flash-page .btn{font:inherit;font-size:13px;border:1px solid var(--ink);border-radius:999px;
+  padding:7px 16px;background:transparent;color:var(--ink)}
+.flash-page .btn:hover{background:var(--soft)}
+.flash-page .btn.on,.flash-page .editor .pri{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+.flash-page .hero{max-width:1120px;padding:54px 24px 26px}
+.flash-page .eyebrow{display:block;color:var(--accent);font:12px/1.4 var(--sans);
+  letter-spacing:.14em;text-transform:uppercase;margin-bottom:22px}
+.flash-page h1.t{font-family:var(--serif);font-size:clamp(38px,4.5vw,54px);font-weight:400;
+  letter-spacing:-.045em;line-height:1.12;margin:0;max-width:1000px;color:var(--ink)}
+.flash-page h1.t .title-accent,.flash-page h1.t .title-rest{color:var(--ink)}
+.flash-page .lead{font-family:var(--sans);font-size:18px;line-height:1.65;font-weight:400;
+  color:var(--muted);max-width:920px;margin-top:20px}
+.flash-page .article-meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:14px;
+  color:var(--ink);font-size:13px;line-height:1.6}
+.flash-page .article-meta span+span:before{content:"";margin:0}
 .flash-page .layout{display:grid;grid-template-columns:190px minmax(0,820px);gap:42px;
-  align-items:start;max-width:1120px;margin:34px auto 0;padding:0 24px}
+  align-items:start;max-width:1120px;margin:30px auto 0;padding:0 24px}
 .flash-page #toc-panel{display:block!important}
 .flash-page .toc{position:sticky;top:82px;max-height:calc(100vh - 110px);overflow:auto;
-  border-left:1px solid #e5e5e5;padding:2px 0 2px 16px;font-size:13px}
-.flash-page .toc summary{font-size:13px;font-weight:650;color:#333;margin-bottom:8px}
-.flash-page .toc a{color:#777;padding:5px 0;line-height:1.5}
+  border-left:1px solid var(--line);padding:2px 0 2px 16px;font-size:13px}
+.flash-page .toc summary{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.flash-page .toc a{color:var(--muted);padding:5px 0;line-height:1.5}
 .flash-page .toc a.l3{padding-left:13px;font-size:12px}
-.flash-page .toc a.on{color:var(--accent);font-weight:650}
-.flash-page article{font-family:var(--sans);font-size:16.5px;line-height:1.82;color:#292929;
+.flash-page .toc a.on{color:var(--accent);font-weight:600}
+.flash-page article{font-family:var(--sans);font-size:16px;line-height:1.8;color:#292824;
   letter-spacing:0;overflow-wrap:anywhere}
-.flash-page article h2{font-family:var(--sans);font-size:clamp(26px,2.7vw,31px);font-weight:700;
-  letter-spacing:-.035em;line-height:1.25;margin:62px 0 18px;padding:0;color:#171717}
+.flash-page article h2{font-family:var(--serif);font-size:clamp(24px,2.5vw,29px);font-weight:500;
+  letter-spacing:-.025em;line-height:1.3;margin:56px 0 16px;padding:0;color:var(--ink)}
 .flash-page article h2:first-child{margin-top:0}
-.flash-page article h3{font-family:var(--sans);font-size:21px;font-weight:680;
-  letter-spacing:-.025em;line-height:1.35;margin:42px 0 12px;color:#171717}
-.flash-page article h4{font-family:var(--sans);font-size:16px;font-weight:680;margin:30px 0 10px;color:#171717}
-.flash-page article p{margin:17px 0}
-.flash-page article ul,.flash-page article ol{margin:16px 0 18px 24px}
-.flash-page article li{margin:7px 0;padding-left:2px}
-.flash-page article strong{font-weight:700;color:#171717}
-.flash-page article a{color:#b95337;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
-.flash-page article code{font-size:.86em;background:#f3f3f3;border:0;border-radius:4px;padding:2px 5px}
-.flash-page article pre{background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;
-  padding:20px 22px;margin:24px 0}
-.flash-page article pre code{background:none;padding:0;font-size:13px;line-height:1.7}
-.flash-page article blockquote{background:transparent;border-left:2px solid #c9c9c9;border-radius:0;
-  padding:2px 0 2px 18px;margin:24px 0;color:#555;font-size:15.5px}
-.flash-page article hr{border:0;border-top:1px solid #e5e5e5;margin:46px 0}
-.flash-page .tw{border:1px solid #e6e6e6;border-radius:7px;background:#fff;margin:25px 0}
+.flash-page article h3{font-family:var(--serif);font-size:20px;font-weight:500;
+  letter-spacing:-.015em;line-height:1.4;margin:38px 0 11px;color:var(--ink)}
+.flash-page article h4{font-family:var(--sans);font-size:15px;font-weight:600;margin:27px 0 9px;color:var(--ink)}
+.flash-page article p{margin:15px 0}
+.flash-page article ul,.flash-page article ol{margin:14px 0 17px 23px}
+.flash-page article li{margin:6px 0;padding-left:2px}
+.flash-page article strong{font-weight:650;color:var(--ink)}
+.flash-page article a{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.flash-page article code{font-size:.86em;background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.flash-page article pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:18px 20px;margin:22px 0}
+.flash-page article pre code{background:none;border:0;padding:0;font-size:13px;line-height:1.65}
+.flash-page article blockquote{background:var(--soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;
+  padding:10px 15px;margin:22px 0;color:var(--muted);font-size:15px}
+.flash-page article hr{border:0;border-top:1px solid var(--line);margin:42px 0}
+.flash-page .tw{border:1px solid var(--line);border-radius:8px;background:var(--surface);margin:22px 0}
 .flash-page article table{font-size:13.5px;line-height:1.6}
-.flash-page article th,.flash-page article td{padding:11px 13px;border-bottom:1px solid #e9e9e9}
-.flash-page article th{background:#f7f7f7;font-weight:700}
-.flash-page .kb-figure{margin:36px 0 42px}
-.flash-page .kb-figure .fig-title{font:700 19px/1.4 var(--sans);letter-spacing:-.02em;color:#171717}
+.flash-page article th,.flash-page article td{padding:10px 12px;border-bottom:1px solid var(--line)}
+.flash-page article th{background:var(--soft);font-weight:600}
+.flash-page .kb-figure{margin:34px 0 40px}
+.flash-page .kb-figure .fig-title{font:600 18px/1.4 var(--sans);letter-spacing:-.01em;color:var(--ink)}
 .flash-page .fig-scroll,.flash-page .fig-flow{border-radius:8px}
-.flash-page footer{max-width:1120px;border-top:1px solid #e5e5e5}
-.flash-page .banner{background:#f7f7f7;border-left-color:#171717;color:#555}
+.flash-page footer{max-width:1120px;border-top:1px solid var(--line)}
+.flash-page .banner{background:var(--soft);border-left-color:var(--accent-2);color:var(--muted)}
 @media(max-width:900px){
   .flash-page .layout{grid-template-columns:1fr;gap:20px}
-  .flash-page .toc{position:static;max-height:none;border:1px solid #e8e8e8;border-radius:8px;padding:12px 15px}
+  .flash-page .toc{position:static;max-height:none;border:1px solid var(--line);border-radius:8px;padding:12px 15px}
 }
 @media(max-width:700px){
-  .flash-page .hero{padding:42px 20px 22px}
-  .flash-page .layout{margin-top:22px;padding:0 20px}
-  .flash-page h1.t{font-size:39px;max-width:none}
-  .flash-page .lead{font-size:17px;line-height:1.68;margin-top:18px}
-  .flash-page article{font-size:15.5px;line-height:1.8}
-  .flash-page article h2{margin-top:48px}
-  .flash-page article h3{font-size:19px;margin-top:34px}
-  .flash-page article pre{padding:15px}
+  .flash-page .hero{padding:40px 20px 20px}
+  .flash-page .layout{margin-top:20px;padding:0 20px}
+  .flash-page h1.t{font-size:36px;max-width:none}
+  .flash-page .lead{font-size:16px;line-height:1.7;margin-top:16px}
+  .flash-page article{font-size:15px;line-height:1.78}
+  .flash-page article h2{margin-top:44px}
+  .flash-page article h3{font-size:19px;margin-top:32px}
+  .flash-page article pre{padding:14px}
 }
 
 </style>
