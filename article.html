@@ -174,8 +174,10 @@ body.flash-page{
 </div></header>
 
 <section class="hero wrap">
+  <span class="eyebrow" id="eyebrow">INFERENCE SYSTEMS · RESEARCH NOTE</span>
   <h1 class="t" id="title">正在读取…</h1>
   <p class="lead" id="lead"></p>
+  <div class="article-meta" id="article-meta"><span>YXM Inference Knowledge Base</span><span>Model Architecture</span></div>
   <div class="banner" id="banner" hidden></div>
 </section>
 
@@ -356,7 +358,14 @@ function paint(d,figures=[],notes=''){
   const r=renderMd(readingCopy(d.md),anchors);
   const title=d.title||r.title||'未命名知识页';
   document.title=title+' · YXM 知识库';
-  $('#title').textContent=title;
+  const titleEl=$('#title');
+  const split=title.match(/^(.+?[：:])\s*(.+)$/);
+  titleEl.textContent='';
+  if(split){
+    const accent=document.createElement('span');accent.className='title-accent';accent.textContent=split[1]+' ';
+    const rest=document.createElement('span');rest.className='title-rest';rest.textContent=split[2];
+    titleEl.append(accent,rest);
+  }else titleEl.textContent=title;
   $('#lead').textContent=d.lead||'';
   const body=$('#body');
   body.querySelectorAll('.kb-figure').forEach(fig=>fig.disposeFigure?.());
